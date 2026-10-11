@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Fretlab — guitar practice</title>
+  <meta name="description" content="See the notes you play on a live fretboard and stave, and tune to any tuning." />
+  <meta name="theme-color" content="#08090a" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="6" width="26" height="20" rx="3"/><path d="M3 12h26M3 17h26M3 22h26M11 6v20M19 6v20"/><circle cx="15" cy="17" r="3"/></svg>
+      <span>Fretlab</span>
+    </div>
+    <div class="mic">
+      <div class="level" aria-hidden="true"><span id="level-bar"></span></div>
+      <button id="mic-btn" class="btn primary" type="button" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <span id="mic-label">Start listening</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" role="alert" hidden></div>
+
+  <main>
+    <div class="controlbar">
+      <div class="tabs" role="tablist" aria-label="Fretboard mode">
+        <button role="tab" id="tab-fretboard" aria-controls="view-fretboard" aria-selected="true" type="button">Live fretboard</button>
+        <button role="tab" id="tab-tuner" aria-controls="view-tuner" aria-selected="false" type="button">Tuner</button>
+      </div>
+      <div class="controls">
+        <label class="field">
+          <span>Tuning</span>
+          <select id="tuning-select"></select>
+        </label>
+        <details class="settings">
+          <summary class="btn ghost" aria-label="Settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+            <span>Settings</span>
+          </summary>
+          <div class="settings-panel">
+            <label class="field"><span>Note names</span>
+              <select id="pref-select"><option value="sharp">Sharps (C♯)</option><option value="flat">Flats (D♭)</option><option value="auto">Match tuning</option></select>
+            </label>
+            <label class="field"><span>Frets shown</span>
+              <select id="frets-select"><option>12</option><option selected>15</option><option>22</option><option>24</option></select>
+            </label>
+            <label class="field"><span>Reference A4 <output id="a4-out">440</output> Hz</span>
+              <input id="a4-input" type="range" min="430" max="450" step="1" value="440" />
+            </label>
+            <label class="field"><span>Mic sensitivity</span>
+              <input id="sens-input" type="range" min="0" max="1" step="0.05" value="0.55" />
+            </label>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div id="custom-editor" class="custom-editor" hidden>
+      <p class="custom-title">Custom tuning <span>— string 6 is the low one</span></p>
+      <div id="custom-strings" class="custom-strings"></div>
+    </div>
+
+    <!-- Live fretboard -->
+    <section id="view-fretboard" role="tabpanel" aria-labelledby="tab-fretboard" class="view">
+      <div class="readouts">
+        <div class="card note-card" id="note-card">
+          <p class="eyebrow">Note</p>
+          <div class="big-note"><span id="note-name">—</span><sub id="note-oct"></sub></div>
+          <p class="enh" id="note-enh">Play a single note</p>
+          <div class="mini-cents" aria-hidden="true"><span class="mid"></span><span id="mini-needle"></span></div>
+          <p class="meta"><span id="note-hz">— Hz</span><span id="note-cents"></span></p>
+          <p class="positions" id="note-positions"></p>
+        </div>
+        <div class="card stave-card">
+          <p class="eyebrow">On the stave</p>
+          <div id="stave"></div>
+          <p class="caption">Guitar music is written an octave higher than it sounds — that’s what the little 8 under the clef means.</p>
+        </div>
+      </div>
+      <div class="card fb-card">
+        <div class="fb-head">
+          <p class="eyebrow">Fretboard <span class="muted">· every place that note lives · tap to hear</span></p>
+          <div class="fb-tools">
+            <label class="toggle"><input type="checkbox" id="names-toggle" /><span>All note names</span></label>
+            <button class="btn ghost small" id="clear-trail" type="button">Clear trail</button>
+          </div>
+        </div>
+        <div class="fb-scroll"><div id="fretboard"></div></div>
+      </div>
+    </section>
+
+    <!-- Tuner -->
+    <section id="view-tuner" role="tabpanel" aria-labelledby="tab-tuner" class="view tuner idle" hidden>
+      <div class="card tuner-card">
+        <div id="gauge" class="gauge"></div>
+        <div class="tuner-readout">
+          <div class="big-note"><span id="tuner-note">—</span><sub id="tuner-octave"></sub></div>
+          <p id="tuner-hint" class="tuner-hint">Play any open string</p>
+          <p class="meta"><span id="tuner-hz"></span><span id="tuner-cents"></span></p>
+        </div>
+        <div class="pill-row">
+          <button id="tuner-auto" class="btn ghost small" type="button" aria-pressed="true">Auto-detect string</button>
+          <div id="string-pills" class="pills"></div>
+        </div>
+        <p class="caption center">Tap a string to lock onto it and hear its reference pitch.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">Works in Chrome, Safari, Edge and Firefox. Play one note at a time, close to the mic.</footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
