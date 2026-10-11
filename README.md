@@ -21,17 +21,17 @@ Push this folder to a GitHub repo and import it in Vercel. Framework preset: **O
 ## Tests
 
 ```bash
-node tests/pitch.test.mjs
+node tests/pitch.test.mjs   # note detector over C2–E6: almost never confidently wrong
+node tests/tuner.test.mjs   # tuner: accuracy through a string's decay, smooth peg-turn tracking, string switching
 ```
-
-Runs the pitch detector over synthetic plucked strings from C2 to E6 and checks it is (a) almost never confidently wrong and (b) accurate to under a cent on pure tones.
 
 ## How it's organised
 
 | File | Job |
 |---|---|
 | `js/pitch.js` | YIN pitch detection (pure maths, testable in Node) |
-| `js/tracker.js` | Smooths raw detections into a steady "current note" (confidence gate, median filter, note debounce) |
+| `js/analysis.js` | One analysis step: samples in, note + tuner readings out (the tuner band-pass filters around the string and uses a longer window) |
+| `js/tracker.js` | `NoteTracker` turns raw detections into a steady current note; `TuneTracker` gives the tuner a continuous, glitch-free pitch that holds through the decay |
 | `js/audio.js` | Microphone input + analysis loop, and the plucked reference tone |
 | `js/notes.js` | Frequency ↔ note maths, spelling, the tuning presets |
 | `js/fretboard.js` | SVG fretboard: draws any tuning, lights every position of a note, fading trail |

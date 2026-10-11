@@ -117,11 +117,15 @@
           <p id="tuner-hint" class="tuner-hint">Play any open string</p>
           <p class="meta"><span id="tuner-hz"></span><span id="tuner-cents"></span></p>
         </div>
+        <div class="trace" aria-hidden="true">
+          <span class="trace-label sharp-label">♯</span><span class="trace-label flat-label">♭</span>
+          <canvas id="tuner-trace"></canvas>
+        </div>
         <div class="pill-row">
           <button id="tuner-auto" class="btn ghost small" type="button" aria-pressed="true">Auto-detect string</button>
           <div id="string-pills" class="pills"></div>
         </div>
-        <p class="caption center">Tap a string to lock onto it and hear its reference pitch.</p>
+        <p class="caption center">Let one string ring at a time. Tap a string to lock onto it and hear its reference pitch.</p>
       </div>
     </section>
   </main>

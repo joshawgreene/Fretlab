@@ -1,21 +1,35 @@
 // Microphone input + analysis loop, and a little plucked-string synth for reference tones.
-import { detectPitch, rms } from './pitch.js';
-import { NoteTracker } from './tracker.js';
+import { NoteTracker, TuneTracker } from './tracker.js';
+import { analyseFrame, NOTE_FRAME, TUNER_FRAME } from './analysis.js';
 import { midiToFreq } from './notes.js';
-
-const FFT_SIZE = 4096;
 
 export class PitchListener {
   constructor(onFrame) {
     this.onFrame = onFrame;
     this.tracker = new NoteTracker();
+    this.tuneTracker = new TuneTracker();
+    this.tunerMode = false;
     this.ctx = null;
     this.running = false;
   }
 
+  /** The tuner analyses a longer stretch of audio for a finer, steadier reading. */
+  setTunerMode(on) {
+    this.tunerMode = on;
+    this.tuneTracker.reset();
+    this.sizeBuffer();
+  }
+
+  sizeBuffer() {
+    if (!this.analyser) return;
+    const size = this.tunerMode ? TUNER_FRAME : NOTE_FRAME;
+    this.analyser.fftSize = size;
+    this.buf = new Float32Array(size);
+  }
+
   /** Sensitivity 0..1 -> RMS gate (higher sensitivity = quieter notes accepted). */
   setSensitivity(v) {
-    this.tracker.gate = 0.04 * Math.pow(0.04, v); // 0.04 .. 0.0016
+    this.tracker.gate = this.tuneTracker.gate = 0.04 * Math.pow(0.04, v); // 0.04 .. 0.0016
   }
 
   async start() {
@@ -31,10 +45,10 @@ export class PitchListener {
     if (this.ctx.state === 'suspended') await this.ctx.resume();
     this.source = this.ctx.createMediaStreamSource(this.stream);
     this.analyser = this.ctx.createAnalyser();
-    this.analyser.fftSize = FFT_SIZE;
     this.source.connect(this.analyser);
-    this.buf = new Float32Array(FFT_SIZE);
+    this.sizeBuffer();
     this.tracker.reset();
+    this.tuneTracker.reset();
     this.running = true;
     this.loop();
   }
@@ -45,7 +59,8 @@ export class PitchListener {
     this.source?.disconnect();
     this.stream?.getTracks().forEach((t) => t.stop());
     this.tracker.reset();
-    this.onFrame({ active: false, freq: null, midi: null, cents: 0, level: 0 });
+    this.tuneTracker.reset();
+    this.onFrame({ active: false, freq: null, midi: null, cents: 0, level: 0, tune: { active: false, held: false, midi: null, freq: null } });
   }
 
   /** Pick up again after the browser suspended audio (iOS does this when backgrounded). */
@@ -70,9 +85,8 @@ export class PitchListener {
     if (now - (this.lastRun || 0) < 22) return;
     this.lastRun = now;
     this.analyser.getFloatTimeDomainData(this.buf);
-    const level = rms(this.buf);
-    const est = level >= this.tracker.gate ? detectPitch(this.buf, this.ctx.sampleRate) : null;
-    this.onFrame(this.tracker.push(est, level));
+    const trackers = { notes: this.tracker, tune: this.tunerMode ? this.tuneTracker : undefined };
+    this.onFrame(analyseFrame(this.buf, this.ctx.sampleRate, trackers, now));
   };
 
   /** Short plucked-string tone for a MIDI note (reference pitch / fretboard taps). */

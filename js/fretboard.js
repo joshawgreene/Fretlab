@@ -8,7 +8,7 @@ const PAD_Y = 22;
 const OPEN_ZONE = 58; // space left of the nut for open-string markers
 const FRET_LEN = 60;
 const INLAYS = [3, 5, 7, 9, 15, 17, 19, 21];
-const TRAIL_LENGTH = 3;
+const TRAIL_LENGTH = 1; // ghost only the previous note
 
 const el = (tag, attrs = {}, parent) => {
   const n = document.createElementNS(NS, tag);

@@ -15,7 +15,8 @@ export function detectPitch(buf, sampleRate, opts = {}) {
   const tauMin = Math.max(2, Math.floor(sampleRate / maxFreq));
   const tauMax = Math.min(Math.ceil(sampleRate / minFreq), Math.floor(buf.length / 2));
   // Integration window: at least two periods of the lowest note, capped for speed.
-  const W = Math.min(buf.length - tauMax, Math.max(2 * tauMax, 1024));
+  // A longer window (opts.window) averages out more noise — the tuner uses this for steadier readings.
+  const W = Math.min(buf.length - tauMax, opts.window ?? Math.max(2 * tauMax, 1024));
   if (W <= 0) return null;
 
   // 1. Difference function d(tau)
@@ -71,4 +72,37 @@ export function rms(buf) {
   let s = 0;
   for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
   return Math.sqrt(s / buf.length);
+}
+
+/**
+ * 4th-order Butterworth low-pass (two cascaded RBJ biquads). The tuner runs this just above the
+ * string's fundamental so the bright upper harmonics — which are slightly sharp on a real string —
+ * don't pull the reading.
+ */
+export function lowpass(buf, cutoff, sampleRate) {
+  return biquad4(buf, cutoff, sampleRate, false);
+}
+
+/** 4th-order Butterworth high-pass: strips a lower string that's still ringing. */
+export function highpass(buf, cutoff, sampleRate) {
+  return biquad4(buf, cutoff, sampleRate, true);
+}
+
+function biquad4(buf, cutoff, sampleRate, high) {
+  const w = (2 * Math.PI * Math.min(cutoff, sampleRate * 0.45)) / sampleRate;
+  const cs = Math.cos(w), al = Math.sin(w) / (2 * Math.SQRT1_2);
+  const b0 = (high ? (1 + cs) : (1 - cs)) / 2 / (1 + al);
+  const b1 = (high ? -(1 + cs) : (1 - cs)) / (1 + al);
+  const a1 = (-2 * cs) / (1 + al), a2 = (1 - al) / (1 + al);
+  let x = buf;
+  for (let pass = 0; pass < 2; pass++) {
+    const y = new Float32Array(x.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const v = b0 * x[i] + b1 * x1 + b0 * x2 - a1 * y1 - a2 * y2;
+      x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v;
+    }
+    x = y;
+  }
+  return x;
 }

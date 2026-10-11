@@ -1,9 +1,10 @@
-// Tuner view: cents gauge, string pills, auto/manual string targeting.
+// Tuner view: cents gauge, pitch trace, string pills, auto/manual string targeting.
 import { noteName, noteLabel, octaveOf } from './notes.js';
 
-const IN_TUNE_CENTS = 5;
+const IN_TUNE_CENTS = 3;
 const HOLD_MS = 900; // how long a string must stay in tune before it gets a tick
 const MAX_ANGLE = 70; // needle swing in degrees at ±50 cents
+const TRACE_SECONDS = 5;
 
 export class Tuner {
   constructor(root, { onPluck }) {
@@ -17,11 +18,13 @@ export class Tuner {
     this.hzEl = root.querySelector('#tuner-hz');
     this.centsEl = root.querySelector('#tuner-cents');
     this.autoBtn = root.querySelector('#tuner-auto');
+    this.trace = new Trace(root.querySelector('#tuner-trace'));
     this.tuning = [];
     this.pref = 'sharp';
     this.locked = null; // index of a manually chosen string, or null for auto
     this.tuned = new Set();
     this.inTuneSince = 0;
+    this.target = null;
     this.drawGauge();
     this.autoBtn.addEventListener('click', () => this.setLocked(null));
   }
@@ -36,6 +39,7 @@ export class Tuner {
 
   setLocked(i) {
     this.locked = i;
+    this.target = null;
     this.autoBtn.setAttribute('aria-pressed', String(i === null));
     this.renderPills();
   }
@@ -52,7 +56,7 @@ export class Tuner {
       this.pillsHost.appendChild(b);
       return b;
     });
-    this.paintPills(null);
+    this.paintPills(this.locked);
   }
 
   paintPills(target) {
@@ -63,54 +67,65 @@ export class Tuner {
     });
   }
 
-  /** Which string is the player tuning? Locked string, else the nearest string by pitch. */
-  targetFor(freqMidi) {
+  /** Which string is the player tuning? Locked string, else the nearest string by pitch (sticky, so it doesn't flicker). */
+  targetFor(m) {
     if (this.locked !== null) return this.locked;
     let best = 0;
-    this.tuning.forEach((m, i) => { if (Math.abs(freqMidi - m) < Math.abs(freqMidi - this.tuning[best])) best = i; });
+    this.tuning.forEach((n, i) => { if (Math.abs(m - n) < Math.abs(m - this.tuning[best])) best = i; });
+    // Stay on the current string unless another is clearly closer.
+    if (this.target !== null && this.target < this.tuning.length &&
+        Math.abs(m - this.tuning[this.target]) < Math.abs(m - this.tuning[best]) + 0.3) best = this.target;
+    this.target = best;
     return best;
   }
 
-  update(frame, freqMidi) {
-    if (!frame.active) {
-      this.setNeedle(0, false, true);
+  /** @param {{active:boolean, held:boolean, midi:number|null, freq:number|null}} tune  @param {boolean} listening */
+  update(tune, listening) {
+    const now = performance.now();
+    if (!tune?.active) {
+      this.trace.push(now, null);
+      this.setNeedle(0, false, true, false);
       this.noteEl.textContent = '—';
       this.octEl.textContent = '';
       this.hzEl.textContent = '';
       this.centsEl.textContent = '';
-      this.hintEl.textContent = this.locked === null ? 'Play any open string' : `Play string ${6 - this.locked}`;
+      this.hintEl.textContent = !listening ? 'Start listening, then play a string'
+        : this.locked === null ? 'Play any open string' : `Play string ${6 - this.locked}`;
       this.inTuneSince = 0;
+      this.target = null;
       this.paintPills(this.locked);
       return;
     }
-    const i = this.targetFor(freqMidi);
+    const i = this.targetFor(tune.midi);
     const target = this.tuning[i];
-    const cents = (freqMidi - target) * 100;
+    const cents = (tune.midi - target) * 100;
     const inTune = Math.abs(cents) <= IN_TUNE_CENTS;
-    const now = performance.now();
-    if (inTune) {
+    if (inTune && !tune.held) {
       this.inTuneSince ||= now;
       if (now - this.inTuneSince > HOLD_MS) this.tuned.add(i);
-    } else this.inTuneSince = 0;
+    } else if (!inTune) this.inTuneSince = 0;
 
+    this.trace.push(now, tune.held ? null : cents);
     this.noteEl.textContent = noteName(target, this.pref);
     this.octEl.textContent = octaveOf(target);
-    this.hzEl.textContent = `${frame.freq.toFixed(1)} Hz`;
-    const far = Math.abs(cents) > 50;
-    this.centsEl.textContent = far ? `${Math.round(Math.abs(cents) / 100)} semitone${Math.abs(cents) >= 150 ? 's' : ''} ${cents < 0 ? 'flat' : 'sharp'}`
-      : `${cents > 0 ? '+' : ''}${cents.toFixed(0)}¢`;
+    this.hzEl.textContent = `${tune.freq.toFixed(2)} Hz`;
+    const abs = Math.abs(cents);
+    this.centsEl.textContent = abs >= 100
+      ? `${Math.round(abs / 100)} semitone${abs >= 150 ? 's' : ''} ${cents < 0 ? 'flat' : 'sharp'}`
+      : `${cents > 0 ? '+' : cents < 0 ? '−' : ''}${abs < 10 ? abs.toFixed(1) : abs.toFixed(0)}¢`;
     this.hintEl.textContent = inTune ? 'In tune' : cents < 0 ? 'Tune up ↑' : 'Tune down ↓';
     this.root.classList.toggle('flat', !inTune && cents < 0);
     this.root.classList.toggle('sharp', !inTune && cents > 0);
-    this.setNeedle(cents, inTune, false);
+    this.setNeedle(cents, inTune, false, tune.held);
     this.paintPills(i);
   }
 
-  setNeedle(cents, inTune, idle) {
+  setNeedle(cents, inTune, idle, held) {
     const a = Math.max(-1, Math.min(1, cents / 50)) * MAX_ANGLE;
-    this.needle.style.transform = `rotate(${a}deg)`;
+    this.needle.style.transform = `rotate(${a.toFixed(2)}deg)`;
     this.root.classList.toggle('in-tune', inTune);
     this.root.classList.toggle('idle', idle);
+    this.root.classList.toggle('held', held);
     if (idle) this.root.classList.remove('flat', 'sharp');
   }
 
@@ -145,5 +160,82 @@ export class Tuner {
       </svg>`;
     this.needle = this.gauge.querySelector('.g-needle');
     this.needle.style.transformOrigin = `${cx}px ${cy}px`;
+  }
+}
+
+/**
+ * Scrolling pitch history: the last few seconds of how far off you are, so you can watch the
+ * line walk into the centre band as you turn the peg. The vertical scale is stretched near zero.
+ */
+class Trace {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.points = [];
+    new ResizeObserver(() => this.resize()).observe(canvas);
+    this.resize();
+  }
+
+  resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const { width, height } = this.canvas.getBoundingClientRect();
+    if (!width || !height) return;
+    this.w = width; this.h = height;
+    this.canvas.width = Math.round(width * dpr);
+    this.canvas.height = Math.round(height * dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.draw();
+  }
+
+  push(t, cents) {
+    this.points.push({ t, c: cents });
+    const cutoff = t - TRACE_SECONDS * 1000;
+    while (this.points.length && this.points[0].t < cutoff) this.points.shift();
+    this.draw(t);
+  }
+
+  y(c) {
+    const v = Math.sign(c) * Math.sqrt(Math.min(Math.abs(c), 50) / 50); // -1..1, magnified near 0
+    return this.h / 2 - v * (this.h / 2 - 3);
+  }
+
+  draw(now = performance.now()) {
+    const { ctx, w, h } = this;
+    if (!w) return;
+    const css = getComputedStyle(this.canvas);
+    const good = css.getPropertyValue('--good').trim() || '#9fd8ff';
+    const off = css.getPropertyValue('--off').trim() || '#9aa3b2';
+    const line = css.getPropertyValue('--line').trim() || '#2a2c31';
+    ctx.clearRect(0, 0, w, h);
+
+    // In-tune band and centre line
+    const bandTop = this.y(IN_TUNE_CENTS), bandBottom = this.y(-IN_TUNE_CENTS);
+    ctx.fillStyle = good + '22';
+    ctx.fillRect(0, bandTop, w, bandBottom - bandTop);
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
+    for (const c of [-25, 25]) { ctx.beginPath(); ctx.moveTo(0, this.y(c)); ctx.lineTo(w, this.y(c)); ctx.stroke(); }
+    ctx.strokeStyle = good + '66';
+    ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+
+    // Pitch line, coloured by whether each stretch is in tune
+    const x = (t) => w - ((now - t) / (TRACE_SECONDS * 1000)) * w;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 1; i < this.points.length; i++) {
+      const a = this.points[i - 1], b = this.points[i];
+      if (a.c === null || b.c === null) continue;
+      ctx.strokeStyle = Math.abs(b.c) <= IN_TUNE_CENTS ? good : off;
+      ctx.beginPath();
+      ctx.moveTo(x(a.t), this.y(a.c));
+      ctx.lineTo(x(b.t), this.y(b.c));
+      ctx.stroke();
+    }
+    const last = this.points.at(-1);
+    if (last && last.c !== null) {
+      ctx.fillStyle = Math.abs(last.c) <= IN_TUNE_CENTS ? good : '#f4f5f7';
+      ctx.beginPath(); ctx.arc(x(last.t) - 3, this.y(last.c), 3.5, 0, Math.PI * 2); ctx.fill();
+    }
   }
 }

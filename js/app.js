@@ -1,4 +1,4 @@
-import { TUNINGS, parseNote, setA4, freqToMidi, noteName, octaveOf, enharmonic, customNoteRange } from './notes.js';
+import { TUNINGS, parseNote, setA4, noteName, octaveOf, enharmonic, customNoteRange } from './notes.js';
 import { PitchListener } from './audio.js';
 import { Fretboard } from './fretboard.js';
 import { renderStave } from './stave.js';
@@ -91,6 +91,8 @@ $('#clear-trail').addEventListener('click', () => fretboard.clearTrail());
 function setView(view) {
   state.view = view;
   document.body.dataset.view = view;
+  listener.setTunerMode(view === 'tuner');
+  if (view === 'tuner') tuner.update(null, listener.running);
   for (const v of ['fretboard', 'tuner']) {
     $(`#tab-${v}`).setAttribute('aria-selected', String(v === view));
     $(`#view-${v}`).hidden = v !== view;
@@ -156,9 +158,7 @@ const levelBar = $('#level-bar');
 
 function onFrame(frame) {
   levelBar.style.transform = `scaleX(${Math.min(1, Math.sqrt(frame.level) * 4)})`;
-  if (state.view === 'tuner') {
-    tuner.update(frame, frame.active ? freqToMidi(frame.freq) : 0);
-  }
+  if (state.view === 'tuner') tuner.update(frame.tune, listener.running);
   if (frame.active) {
     lastMidi = frame.midi;
     lastFrame = frame;
