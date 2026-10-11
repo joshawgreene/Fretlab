@@ -3,6 +3,7 @@ import { PitchListener } from './audio.js';
 import { Fretboard } from './fretboard.js';
 import { renderStave } from './stave.js';
 import { Tuner } from './tuner.js';
+import { SCALES, ROOTS, scaleById, scalePcs, keyPref, rootName, positions, buildPath } from './scales.js';
 
 const $ = (s) => document.querySelector(s);
 const STORE_KEY = 'fretlab:v1';
@@ -17,6 +18,10 @@ const defaults = {
   showNames: false,
   a4: 440,
   sensitivity: 0.55,
+  learnRoot: 0,
+  learnScale: 'major',
+  learnPosition: 'box-0',
+  learnDir: 'up',
 };
 const state = { ...defaults, ...load() };
 function load() {
@@ -31,11 +36,19 @@ const currentTuning = () => {
   const t = TUNINGS.find((x) => x.id === state.tuningId) || TUNINGS[0];
   return { notes: t.notes.map(parseNote), pref: t.pref || 'sharp' };
 };
-const notePref = () => (state.pref === 'auto' ? currentTuning().pref : state.pref);
+const notePref = () => (state.view === 'learn' && state.pref === 'auto'
+  ? keyPref(state.learnRoot, state.learnScale)
+  : state.pref === 'auto' ? currentTuning().pref : state.pref);
 
 // Phones in landscape always get the full neck; the "Frets shown" setting is for bigger screens.
 const phoneLandscape = window.matchMedia('(orientation: landscape) and (max-height: 500px)');
 const fretsShown = () => (phoneLandscape.matches ? 22 : state.frets);
+const staveCompact = () => window.innerHeight < 760;
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { lastReadoutKey = ''; showReadout(lastMidi, lastFrame, !lastFrame?.active); renderLearn(); }, 120);
+});
 phoneLandscape.addEventListener('change', () => applyAll());
 
 // ---------- components ----------
@@ -62,7 +75,10 @@ function applyAll() {
   $('#names-toggle').checked = state.showNames;
   fretboard.configure({ tuning: notes, frets: fretsShown(), pref, showNames: state.showNames });
   tuner.setTuning(notes, pref);
+  $('#open-strings').innerHTML = notes.map((m, i) => `<span><small>${6 - i}</small>${noteName(m, pref)}</span>`).join('');
   renderCustomEditor();
+  rebuildLearn();
+  lastReadoutKey = '';
   showReadout(lastMidi, lastFrame, !listener.running || !lastFrame?.active);
   save();
 }
@@ -84,7 +100,12 @@ $('#custom-strings').addEventListener('change', (e) => {
   listener.pluck(state.custom[i]);
   applyAll();
 });
-tuningSelect.addEventListener('change', () => { state.tuningId = tuningSelect.value; fretboard.clearTrail(); applyAll(); });
+tuningSelect.addEventListener('change', () => {
+  state.tuningId = tuningSelect.value;
+  fretboard.clearTrail();
+  applyAll();
+  if (state.tuningId === 'custom') $('#custom-editor').open = true;
+});
 $('#pref-select').addEventListener('change', (e) => { state.pref = e.target.value; applyAll(); });
 $('#frets-select').addEventListener('change', (e) => { state.frets = Number(e.target.value); applyAll(); });
 $('#a4-input').addEventListener('input', (e) => { state.a4 = Number(e.target.value); applyAll(); });
@@ -92,19 +113,21 @@ $('#sens-input').addEventListener('input', (e) => { state.sensitivity = Number(e
 $('#names-toggle').addEventListener('change', (e) => { state.showNames = e.target.checked; applyAll(); });
 $('#clear-trail').addEventListener('click', () => fretboard.clearTrail());
 
-// Tabs
+// Tabs. Fretboard and Learn share the fretboard + stave; Learn swaps the note panel for its own.
 function setView(view) {
+  const changed = state.view !== view;
   state.view = view;
   document.body.dataset.view = view;
   listener.setTunerMode(view === 'tuner');
   if (view === 'tuner') tuner.update(null, listener.running);
-  for (const v of ['fretboard', 'tuner']) {
-    $(`#tab-${v}`).setAttribute('aria-selected', String(v === view));
-    $(`#view-${v}`).hidden = v !== view;
-  }
+  for (const v of ['fretboard', 'learn', 'tuner']) $(`#tab-${v}`).setAttribute('aria-selected', String(v === view));
+  $('#view-fretboard').hidden = view === 'tuner';
+  $('#view-tuner').hidden = view !== 'tuner';
+  if (changed) applyAll(); // note spelling and the fretboard overlay depend on the view
   save();
 }
 $('#tab-fretboard').addEventListener('click', () => setView('fretboard'));
+$('#tab-learn').addEventListener('click', () => setView('learn'));
 $('#tab-tuner').addEventListener('click', () => setView('tuner'));
 $('#rotate-tuner').addEventListener('click', () => setView('tuner'));
 
@@ -125,9 +148,8 @@ micBtn.addEventListener('click', async () => {
     }
   }
   micBtn.setAttribute('aria-pressed', String(listener.running));
-  const label = listener.running ? 'Stop listening' : 'Start listening';
-  $('#mic-label').textContent = label;
-  micBtn.setAttribute('aria-label', label);
+  $('#mic-label').textContent = listener.running ? 'Stop' : 'Listen';
+  micBtn.setAttribute('aria-label', listener.running ? 'Stop listening' : 'Start listening');
   document.body.classList.toggle('listening', listener.running);
   if (listener.running) keepAwake(); else releaseWake();
 });
@@ -161,6 +183,8 @@ let lastMidi = null;
 let lastFrame = null;
 const levelBar = $('#level-bar');
 
+let heardMidi = null; // the note currently sounding, for spotting each new note in Learn mode
+
 function onFrame(frame) {
   levelBar.style.transform = `scaleX(${Math.min(1, Math.sqrt(frame.level) * 4)})`;
   if (state.view === 'tuner') tuner.update(frame.tune, listener.running);
@@ -168,11 +192,14 @@ function onFrame(frame) {
     lastMidi = frame.midi;
     lastFrame = frame;
     if (fretboard.show(frame.midi)) fretboard.revealCurrent();
+    if (frame.midi !== heardMidi) { heardMidi = frame.midi; learnHeard(frame.midi); }
+  } else {
+    heardMidi = null;
   }
   showReadout(lastMidi, frame.active ? frame : lastFrame, !frame.active);
 }
 
-/** Tap a fretboard position: hear it, and (when not listening) show it. */
+/** Tap a fretboard position: hear it, and (when not listening) show it / play it in Learn mode. */
 function tapNote(midi) {
   listener.pluck(midi);
   if (!listener.running) {
@@ -180,11 +207,128 @@ function tapNote(midi) {
     lastFrame = null;
     fretboard.show(midi);
     showReadout(midi, null, false);
+    learnHeard(midi);
   }
+}
+
+// ---------- Learn mode ----------
+const learn = { path: [], index: 0, started: 0, finished: 0, slips: 0, demo: null };
+
+$('#learn-root').innerHTML = ROOTS.map((r) => `<option value="${r.pc}">${r.sharp === r.flat ? r.sharp : `${r.sharp} / ${r.flat}`}</option>`).join('');
+$('#learn-scale').innerHTML = SCALES.map((sc) => `<option value="${sc.id}">${sc.name}</option>`).join('');
+$('#learn-root').addEventListener('change', (e) => { state.learnRoot = Number(e.target.value); applyAll(); });
+$('#learn-scale').addEventListener('change', (e) => { state.learnScale = e.target.value; applyAll(); });
+$('#learn-position').addEventListener('change', (e) => { state.learnPosition = e.target.value; applyAll(); });
+document.querySelectorAll('.seg [data-dir]').forEach((b) => b.addEventListener('click', () => { state.learnDir = b.dataset.dir; applyAll(); }));
+$('#learn-restart').addEventListener('click', () => { restartLearn(); renderLearn(); });
+$('#learn-hear').addEventListener('click', () => playDemo());
+
+/** Recompute the scale path from the current settings, keeping progress if nothing changed. */
+function rebuildLearn() {
+  const { notes } = currentTuning();
+  const frets = fretsShown();
+  const pos = positions(notes, state.learnRoot, frets);
+  if (!pos.some((p) => p.id === state.learnPosition)) state.learnPosition = (pos[1] || pos[0]).id;
+  $('#learn-position').innerHTML = pos.map((p) => `<option value="${p.id}">${p.label}</option>`).join('');
+  $('#learn-root').value = String(state.learnRoot);
+  $('#learn-scale').value = state.learnScale;
+  $('#learn-position').value = state.learnPosition;
+  document.querySelectorAll('.seg [data-dir]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dir === state.learnDir)));
+  const path = buildPath(notes, { rootPc: state.learnRoot, scaleId: state.learnScale, positionId: state.learnPosition, frets, direction: state.learnDir });
+  const sig = path.map((n) => `${n.s}:${n.f}`).join();
+  if (sig !== learn.sig) { learn.sig = sig; learn.path = path; restartLearn(); }
+  renderLearn();
+}
+
+function restartLearn() {
+  stopDemo();
+  learn.index = 0;
+  learn.started = 0;
+  learn.finished = 0;
+  learn.slips = 0;
+}
+
+/** A new note was heard (or tapped). Advance if it's the one we're waiting for. */
+function learnHeard(midi) {
+  if (state.view !== 'learn' || learn.demo || learn.index >= learn.path.length) return;
+  const target = learn.path[learn.index];
+  if (midi === target.midi) {
+    fretboard.flash(target.s, target.f);
+    if (learn.index === 0) learn.started = performance.now();
+    learn.index++;
+    if (learn.index === learn.path.length) learn.finished = performance.now();
+    renderLearn();
+  } else if (learn.index > 0) {
+    learn.slips++;
+  }
+}
+
+function renderLearn() {
+  const active = state.view === 'learn';
+  fretboard.setLearn(active ? {
+    pcs: scalePcs(state.learnRoot, state.learnScale), rootPc: state.learnRoot, path: learn.path, index: learn.index,
+  } : null);
+  if (!active) return;
+  const pref = keyPref(state.learnRoot, state.learnScale);
+  $('#learn-title').textContent = `${rootName(state.learnRoot, state.learnScale)} ${scaleById(state.learnScale).name.toLowerCase()}`;
+  const total = learn.path.length;
+  const done = total > 0 && learn.index >= total;
+  $('#learn-card').classList.toggle('finished', done);
+  $('#learn-bar').style.transform = `scaleX(${total ? learn.index / total : 0})`;
+  if (done) {
+    const secs = Math.max(1, Math.round((learn.finished - learn.started) / 1000));
+    $('#learn-label').textContent = 'Done';
+    $('#learn-note').textContent = '✓';
+    $('#learn-oct').textContent = '';
+    $('#learn-where').textContent = `${total} notes in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+      + (learn.slips ? ` · ${learn.slips} wrong note${learn.slips > 1 ? 's' : ''}` : ' · no wrong notes');
+    $('#learn-count').textContent = 'Tap ↻ to go again';
+    renderStave($('#stave'), null, pref, { compact: staveCompact() });
+    return;
+  }
+  const t = learn.path[learn.index];
+  if (!t) {
+    $('#learn-note').textContent = '—';
+    $('#learn-where').textContent = 'No notes here — pick another position';
+    $('#learn-count').textContent = '';
+    return;
+  }
+  $('#learn-label').textContent = learn.index === 0 ? (listener.running ? 'Play' : 'Start listening, then play') : 'Next';
+  $('#learn-note').textContent = noteName(t.midi, pref);
+  $('#learn-oct').textContent = octaveOf(t.midi);
+  $('#learn-where').textContent = `${t.f === 0 ? 'open' : `fret ${t.f}`} · string ${6 - t.s}${t.root ? ' · root' : ''}`;
+  $('#learn-count').textContent = `${learn.index + 1} of ${total}`;
+  renderStave($('#stave'), t.midi, pref, { compact: staveCompact() });
+}
+
+/** Play the scale through once, lighting each note. */
+function playDemo() {
+  if (learn.demo) { stopDemo(); renderLearn(); return; }
+  restartLearn();
+  let i = 0;
+  const step = () => {
+    if (i >= learn.path.length) { stopDemo(); renderLearn(); return; }
+    const n = learn.path[i];
+    listener.pluck(n.midi, 0.7);
+    learn.index = i;
+    renderLearn();
+    fretboard.flash(n.s, n.f);
+    i++;
+    learn.demo = setTimeout(step, 360);
+  };
+  $('#learn-hear').setAttribute('aria-pressed', 'true');
+  step();
+}
+function stopDemo() {
+  if (learn.demo) clearTimeout(learn.demo);
+  learn.demo = null;
+  learn.index = 0;
+  $('#learn-hear')?.setAttribute('aria-pressed', 'false');
 }
 
 let lastReadoutKey = '';
 function showReadout(midi, frame, stale) {
+  if (state.view === 'learn') { fretboard.svg?.classList.toggle('stale', stale); return; }
   const pref = notePref();
   $('#note-card').classList.toggle('stale', stale && midi !== null);
   fretboard.svg?.classList.toggle('stale', stale);
@@ -193,11 +337,11 @@ function showReadout(midi, frame, stale) {
   $('#note-card').classList.toggle('in-tune', inTune && !stale);
   fretboard.setInTune(inTune && !stale);
   $('#mini-needle').style.transform = `translateX(${Math.max(-50, Math.min(50, cents))}%)`;
-  $('#note-hz').textContent = frame ? `${frame.freq.toFixed(1)} Hz` : midi !== null ? '' : '— Hz';
+  $('#note-hz').textContent = frame ? frame.freq.toFixed(1) : '—';
   $('#note-cents').textContent = frame ? `${cents > 0 ? '+' : ''}${cents.toFixed(0)}¢` : '';
 
   // Everything below only changes when the note changes — skip DOM work otherwise.
-  const key = `${midi}|${pref}|${state.tuningId}|${state.custom}|${fretsShown()}|${phoneLandscape.matches}`;
+  const key = `${midi}|${pref}|${state.tuningId}|${state.custom}|${fretsShown()}|${staveCompact()}`;
   if (key === lastReadoutKey) return;
   lastReadoutKey = key;
   if (midi === null) {
@@ -205,7 +349,7 @@ function showReadout(midi, frame, stale) {
     $('#note-oct').textContent = '';
     $('#note-enh').textContent = listener.running ? 'Play a single note' : 'Start listening, or tap the fretboard';
     $('#note-positions').textContent = '';
-    renderStave($('#stave'), null, pref, { compact: phoneLandscape.matches });
+    renderStave($('#stave'), null, pref, { compact: staveCompact() });
     return;
   }
   $('#note-name').textContent = noteName(midi, pref);
@@ -218,7 +362,7 @@ function showReadout(midi, frame, stale) {
     .filter((p) => p.fret >= 0 && p.fret <= fretsShown())
     .map((p) => (p.fret === 0 ? `string ${p.string} open` : `string ${p.string} fret ${p.fret}`));
   $('#note-positions').textContent = where.length ? where.join(' · ') : 'Not on the frets shown';
-  renderStave($('#stave'), midi, pref, { compact: phoneLandscape.matches });
+  renderStave($('#stave'), midi, pref, { compact: staveCompact() });
 }
 
 // ---------- boot ----------

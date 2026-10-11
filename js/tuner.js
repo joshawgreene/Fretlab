@@ -87,7 +87,7 @@ export class Tuner {
       this.setNeedle(0, false, true, false);
       this.noteEl.textContent = '—';
       this.octEl.textContent = '';
-      this.hzEl.textContent = '';
+      this.hzEl.textContent = '—';
       this.centsEl.textContent = '';
       this.hintEl.textContent = !listening ? 'Start listening, then play a string'
         : this.locked === null ? 'Play any open string' : `Play string ${6 - this.locked}`;
@@ -108,7 +108,7 @@ export class Tuner {
     this.trace.push(now, tune.held ? null : cents);
     this.noteEl.textContent = noteName(target, this.pref);
     this.octEl.textContent = octaveOf(target);
-    this.hzEl.textContent = `${tune.freq.toFixed(2)} Hz`;
+    this.hzEl.textContent = tune.freq.toFixed(2);
     const abs = Math.abs(cents);
     this.centsEl.textContent = abs >= 100
       ? `${Math.round(abs / 100)} semitone${abs >= 150 ? 's' : ''} ${cents < 0 ? 'flat' : 'sharp'}`
@@ -205,7 +205,8 @@ class Trace {
     const css = getComputedStyle(this.canvas);
     const good = css.getPropertyValue('--good').trim() || '#9fd8ff';
     const off = css.getPropertyValue('--off').trim() || '#9aa3b2';
-    const line = css.getPropertyValue('--line').trim() || '#2a2c31';
+    const line = css.getPropertyValue('--line').trim() || '#d6d6d3';
+    const ink = css.getPropertyValue('--ink').trim() || '#0b0b0b';
     ctx.clearRect(0, 0, w, h);
 
     // In-tune band and centre line
@@ -220,13 +221,13 @@ class Trace {
 
     // Pitch line, coloured by whether each stretch is in tune
     const x = (t) => w - ((now - t) / (TRACE_SECONDS * 1000)) * w;
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
     for (let i = 1; i < this.points.length; i++) {
       const a = this.points[i - 1], b = this.points[i];
       if (a.c === null || b.c === null) continue;
-      ctx.strokeStyle = Math.abs(b.c) <= IN_TUNE_CENTS ? good : off;
+      ctx.strokeStyle = Math.abs(b.c) <= IN_TUNE_CENTS ? good : ink;
       ctx.beginPath();
       ctx.moveTo(x(a.t), this.y(a.c));
       ctx.lineTo(x(b.t), this.y(b.c));
@@ -234,8 +235,8 @@ class Trace {
     }
     const last = this.points.at(-1);
     if (last && last.c !== null) {
-      ctx.fillStyle = Math.abs(last.c) <= IN_TUNE_CENTS ? good : '#f4f5f7';
-      ctx.beginPath(); ctx.arc(x(last.t) - 3, this.y(last.c), 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = Math.abs(last.c) <= IN_TUNE_CENTS ? good : ink;
+      ctx.fillRect(x(last.t) - 9, this.y(last.c) - 4, 8, 8);
     }
   }
 }

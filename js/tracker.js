@@ -3,6 +3,8 @@
 import { freqToMidi, midiToFreq } from './notes.js';
 
 export const CLARITY_GATE = 0.9; // YIN confidence needed to accept a frame (see tests/pitch.test.mjs)
+const SUSTAIN_CLARITY = 0.75; // ...or this much, if it continues the note already sounding
+export const SUSTAIN_LEVEL = 0.3; // ...at down to this fraction of the level gate
 const HISTORY = 5; // frames in the median filter
 const CONFIRM_FRAMES = 2; // frames a new note must persist before we switch to it
 const RELEASE_FRAMES = 6; // silent frames before we say "nothing playing"
@@ -27,6 +29,13 @@ export class NoteTracker {
    * @returns {{active:boolean, freq:number|null, midi:number|null, cents:number, level:number}}
    */
   push(est, level) {
+    // Once a note is sounding, keep following it as it fades: a quieter, slightly less clear
+    // reading at the same pitch still counts. Low strings on small mics need this most.
+    if (this.midi !== null && est && est.clarity >= SUSTAIN_CLARITY && level >= this.gate * SUSTAIN_LEVEL &&
+        Math.abs(freqToMidi(est.freq) - this.midi) < 0.5) {
+      est = { freq: est.freq, clarity: CLARITY_GATE };
+      level = Math.max(level, this.gate);
+    }
     const heard = est && level >= this.gate && est.clarity >= CLARITY_GATE;
     if (!heard) {
       this.silent++;

@@ -1,6 +1,10 @@
 # Fretlab
 
-Guitar practice in the browser. Play a note and see it on a live fretboard and a music stave; tune to any standard, alternate or custom tuning.
+Guitar practice in the browser.
+
+- **Fretboard** — play a note and see every place it lives on the neck, plus the note on a stave.
+- **Learn** — pick a key, scale and position; the scale lights up orange and you play through it note by note.
+- **Tuner** — standard, alternate and custom tunings, with a live pitch trace.
 
 No build step and no dependencies — plain HTML, CSS and JavaScript modules.
 
@@ -23,6 +27,8 @@ Push this folder to a GitHub repo and import it in Vercel. Framework preset: **O
 ```bash
 node tests/pitch.test.mjs   # note detector over C2–E6: almost never confidently wrong
 node tests/tuner.test.mjs   # tuner: accuracy through a string's decay, smooth peg-turn tracking, string switching
+node tests/lowstrings.test.mjs  # low notes as a laptop/phone mic hears them: weak fundamental, ringing strings, echo
+node tests/scales.test.mjs  # Learn mode: scale spelling, box shapes, neck paths
 ```
 
 ## How it's organised
@@ -34,9 +40,10 @@ node tests/tuner.test.mjs   # tuner: accuracy through a string's decay, smooth p
 | `js/tracker.js` | `NoteTracker` turns raw detections into a steady current note; `TuneTracker` gives the tuner a continuous, glitch-free pitch that holds through the decay |
 | `js/audio.js` | Microphone input + analysis loop, and the plucked reference tone |
 | `js/notes.js` | Frequency ↔ note maths, spelling, the tuning presets |
-| `js/fretboard.js` | SVG fretboard: draws any tuning, lights every position of a note, fading trail |
+| `js/fretboard.js` | SVG fretboard: draws any tuning, lights every position of a note, Learn-mode scale overlay |
 | `js/stave.js` | SVG treble-clef-8 stave (guitar notation is written an octave above sounding pitch) |
-| `js/tuner.js` | Tuner gauge, string pills, auto/locked string targeting |
+| `js/tuner.js` | Tuner gauge, pitch trace, string pills, auto/locked string targeting |
+| `js/scales.js` | Learn mode: scale definitions, key spelling, positions on the neck, the order to play them |
 | `js/app.js` | Wires it all together; settings persist in localStorage |
 
 Adding a new mode: add a tab + `<section>` in `index.html`, a module in `js/`, and hook it into `setView()` and `onFrame()` in `app.js`.

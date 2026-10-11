@@ -2,10 +2,12 @@
 // No browser APIs, so tests and benchmarks run exactly what the app runs.
 import { detectPitch, rms, lowpass, highpass } from './pitch.js';
 import { midiToFreq } from './notes.js';
+import { SUSTAIN_LEVEL } from './tracker.js';
 
 export const NOTE_FRAME = 4096; // samples analysed for the live fretboard
 export const TUNER_FRAME = 8192; // the tuner keeps a longer history for its filtered fine reading
 const FINE_WINDOW = 3072;
+const LOW_NOTE_HZ = 500; // roughly the bottom four strings and their lower frets
 
 /**
  * @param {Float32Array} buf  newest samples (TUNER_FRAME long in tuner mode, else NOTE_FRAME)
@@ -17,8 +19,14 @@ export function analyseFrame(buf, sampleRate, trackers, now) {
   const recent = buf.length > NOTE_FRAME ? buf.subarray(buf.length - NOTE_FRAME) : buf;
   const level = rms(recent);
   const { notes, tune } = trackers;
-  const minGate = tune ? notes.gate * 0.5 : notes.gate;
-  const est = level >= minGate ? detectPitch(recent, sampleRate) : null;
+  const minGate = notes.gate * (tune ? Math.min(0.5, SUSTAIN_LEVEL) : SUSTAIN_LEVEL);
+  let est = level >= minGate ? detectPitch(recent, sampleRate) : null;
+  // Low notes: bright upper overtones (and a string's slight inharmonicity) blur the reading,
+  // so take a second one with them filtered out and keep whichever is clearer.
+  if (est && est.freq < LOW_NOTE_HZ) {
+    const smooth = detectPitch(lowpass(recent, 1100, sampleRate), sampleRate, { maxFreq: 1000 });
+    if (smooth && smooth.clarity > est.clarity) est = smooth;
+  }
   const frame = notes.push(est, level);
   if (!tune) return frame;
 

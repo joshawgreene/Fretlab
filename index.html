@@ -4,45 +4,139 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Fretlab — guitar practice</title>
-  <meta name="description" content="See the notes you play on a live fretboard and stave, and tune to any tuning." />
-  <meta name="theme-color" content="#08090a" />
+  <meta name="description" content="See the notes you play on a live fretboard and stave, learn scales, and tune to any tuning." />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Fretlab" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="6" width="26" height="20" rx="3"/><path d="M3 12h26M3 17h26M3 22h26M11 6v20M19 6v20"/><circle cx="15" cy="17" r="3"/></svg>
-      <span>Fretlab</span>
+<body data-view="fretboard">
+  <div class="app">
+
+    <!-- Fretboard + Learn: [stave | note or learn | controls] over the fretboard -->
+    <div id="view-fretboard" class="view-group">
+      <section class="mod mod-a stave-mod" aria-label="Stave">
+        <header class="mod-head"><span>Stave</span><span class="muted">written 8va</span></header>
+        <div id="stave"></div>
+      </section>
+
+      <section class="mod mod-b note-card" id="note-card" aria-label="Note">
+        <header class="mod-head"><span>Note</span><span id="note-cents"></span></header>
+        <div class="big-note"><span id="note-name">—</span><sub id="note-oct"></sub></div>
+        <p class="enh" id="note-enh">Play a single note</p>
+        <div class="freq"><span id="note-hz">—</span><span class="unit">Hz</span></div>
+        <div class="mini-cents" aria-hidden="true"><span class="mid"></span><span id="mini-needle"></span></div>
+        <p class="positions" id="note-positions"></p>
+      </section>
+
+      <section class="mod mod-b learn-card" id="learn-card" aria-label="Learn">
+        <header class="mod-head learn-head">
+          <details class="picker" id="learn-picker">
+            <summary class="btn small"><span id="learn-title">C major</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+            <div class="picker-panel">
+              <label class="field"><span>Key</span><select id="learn-root"></select></label>
+              <label class="field"><span>Scale</span><select id="learn-scale"></select></label>
+              <label class="field"><span>Where on the neck</span><select id="learn-position"></select></label>
+              <div class="seg" role="group" aria-label="Direction">
+                <button type="button" data-dir="up">Up</button><button type="button" data-dir="updown">Up &amp; down</button>
+              </div>
+            </div>
+          </details>
+          <button class="btn icon" id="learn-hear" type="button" aria-label="Hear the scale" title="Hear it">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg></button>
+          <button class="btn icon" id="learn-restart" type="button" aria-label="Start again" title="Start again">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg></button>
+        </header>
+        <div class="learn-body">
+          <p class="label" id="learn-label">Play</p>
+          <div class="big-note"><span id="learn-note">—</span><sub id="learn-oct"></sub></div>
+          <p class="learn-where" id="learn-where"></p>
+        </div>
+        <div class="learn-foot">
+          <div class="progress" aria-hidden="true"><span id="learn-bar"></span></div>
+          <p class="learn-count" id="learn-count"></p>
+        </div>
+      </section>
+
+      <section class="mod mod-board fb-card" aria-label="Fretboard">
+        <header class="mod-head"><span id="fb-label">Fretboard <span class="muted">· tap any fret to hear it</span></span>
+          <button class="link" id="clear-trail" type="button">Clear</button></header>
+        <div id="fretboard"></div>
+      </section>
+
+      <div class="mod rotate-prompt">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><rect class="phone" x="22" y="8" width="20" height="36"/><path class="arrow" d="M14 50a22 22 0 0 0 36 0"/><path class="arrow" d="M46 46l4 4-6 2"/></svg>
+        <p class="rotate-title">Turn your phone sideways</p>
+        <p class="rotate-text">The fretboard needs landscape to fit all 22 frets.</p>
+        <button class="btn" id="rotate-tuner" type="button">Use the tuner instead</button>
+      </div>
     </div>
-    <div class="controlbar">
-      <div class="tabs" role="tablist" aria-label="Fretboard mode">
+
+    <!-- Tuner: [gauge | readout | controls] over the pitch trace and strings -->
+    <div id="view-tuner" class="view-group tuner idle" hidden>
+      <section class="mod mod-a gauge-mod" aria-label="Tuner gauge">
+        <header class="mod-head"><span>Tuner</span><span class="muted">±3¢ = in tune</span></header>
+        <div id="gauge" class="gauge"></div>
+      </section>
+      <section class="mod mod-b tuner-readout" aria-label="Tuning">
+        <header class="mod-head"><span>String</span><span id="tuner-cents"></span></header>
+        <div class="big-note"><span id="tuner-note">—</span><sub id="tuner-octave"></sub></div>
+        <p id="tuner-hint" class="tuner-hint">Play any open string</p>
+        <div class="freq"><span id="tuner-hz">—</span><span class="unit">Hz</span></div>
+      </section>
+      <section class="mod mod-board trace-mod" aria-label="Pitch trace and strings">
+        <header class="mod-head"><span>Pitch <span class="muted">· last 5 seconds · let one string ring at a time</span></span></header>
+        <div class="trace" aria-hidden="true">
+          <span class="trace-label sharp-label">♯ sharp</span><span class="trace-label flat-label">♭ flat</span>
+          <canvas id="tuner-trace"></canvas>
+        </div>
+        <div class="pill-row">
+          <button id="tuner-auto" class="btn small" type="button" aria-pressed="true">Auto</button>
+          <div id="string-pills" class="pills"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Controls (shared by every view) -->
+    <section class="mod mod-c controls" aria-label="Controls">
+      <header class="mod-head brand-row">
+        <span class="brand">Fretlab</span>
+        <div class="level" aria-hidden="true"><span id="level-bar"></span></div>
+      </header>
+      <div class="tabs" role="tablist" aria-label="Mode">
         <button role="tab" id="tab-fretboard" aria-controls="view-fretboard" aria-selected="true" type="button">Fretboard</button>
+        <button role="tab" id="tab-learn" aria-controls="view-fretboard" aria-selected="false" type="button">Learn</button>
         <button role="tab" id="tab-tuner" aria-controls="view-tuner" aria-selected="false" type="button">Tuner</button>
       </div>
-      <div class="controls">
-        <label class="field">
-          <span>Tuning</span>
-          <select id="tuning-select"></select>
-        </label>
+      <div class="ctrl-row">
+        <label class="field grow"><span class="sr">Tuning</span><select id="tuning-select"></select></label>
+        <details class="custom" id="custom-editor" hidden>
+          <summary class="btn small" title="Edit the custom tuning">Strings</summary>
+          <div class="custom-panel">
+            <p class="custom-title">Custom tuning <span>· string 6 is the low one</span></p>
+            <div id="custom-strings" class="custom-strings"></div>
+          </div>
+        </details>
+      </div>
+      <div class="open-strings" id="open-strings" aria-label="Open strings, low to high"></div>
+      <div class="ctrl-row">
         <details class="settings">
-          <summary class="btn ghost" aria-label="Settings">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
-            <span class="label">Settings</span>
+          <summary class="btn icon" aria-label="Settings" title="Settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><rect x="14" y="5" width="4" height="4"/><rect x="6" y="15" width="4" height="4"/></svg>
           </summary>
           <div class="settings-panel">
             <label class="toggle"><input type="checkbox" id="names-toggle" /><span>Show all note names on the fretboard</span></label>
             <label class="field"><span>Note names</span>
-              <select id="pref-select"><option value="sharp">Sharps (C♯)</option><option value="flat">Flats (D♭)</option><option value="auto">Match tuning</option></select>
+              <select id="pref-select"><option value="sharp">Sharps (C♯)</option><option value="flat">Flats (D♭)</option><option value="auto">Match tuning / key</option></select>
             </label>
             <label class="field frets-field"><span>Frets shown</span>
               <select id="frets-select"><option>12</option><option selected>15</option><option>22</option><option>24</option></select>
@@ -55,82 +149,15 @@
             </label>
           </div>
         </details>
+        <button id="mic-btn" class="btn primary grow" type="button" aria-pressed="false" aria-label="Start listening">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          <span id="mic-label">Listen</span>
+        </button>
       </div>
-    </div>
-    <div class="mic">
-      <div class="level" aria-hidden="true"><span id="level-bar"></span></div>
-      <button id="mic-btn" class="btn primary" type="button" aria-pressed="false" aria-label="Start listening">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-        <span id="mic-label" class="label">Start listening</span>
-      </button>
-    </div>
-  </header>
+    </section>
+  </div>
 
   <div id="banner" class="banner" role="alert" hidden></div>
-
-  <main>
-  <div id="custom-editor" class="custom-editor" hidden>
-      <p class="custom-title">Custom tuning <span>— string 6 is the low one</span></p>
-      <div id="custom-strings" class="custom-strings"></div>
-    </div>
-
-    <!-- Live fretboard -->
-    <section id="view-fretboard" role="tabpanel" aria-labelledby="tab-fretboard" class="view">
-      <div class="rotate-prompt">
-        <svg viewBox="0 0 64 64" aria-hidden="true"><rect class="phone" x="22" y="8" width="20" height="36" rx="4"/><path class="arrow" d="M14 50a22 22 0 0 0 36 0"/><path class="arrow" d="M46 46l4 4-6 2"/></svg>
-        <p class="rotate-title">Turn your phone sideways</p>
-        <p class="rotate-text">The fretboard needs landscape to fit every fret on screen.</p>
-        <button class="btn ghost small" id="rotate-tuner" type="button">Use the tuner instead</button>
-      </div>
-      <div class="readouts">
-        <div class="card note-card" id="note-card">
-          <p class="eyebrow">Note</p>
-          <div class="big-note"><span id="note-name">—</span><sub id="note-oct"></sub></div>
-          <p class="enh" id="note-enh">Play a single note</p>
-          <div class="mini-cents" aria-hidden="true"><span class="mid"></span><span id="mini-needle"></span></div>
-          <p class="meta"><span id="note-hz">— Hz</span><span id="note-cents"></span></p>
-          <p class="positions" id="note-positions"></p>
-        </div>
-        <div class="card stave-card">
-          <p class="eyebrow">On the stave</p>
-          <div id="stave"></div>
-          <p class="caption">Guitar music is written an octave higher than it sounds — that’s what the little 8 under the clef means.</p>
-        </div>
-      </div>
-      <div class="card fb-card">
-        <div class="fb-head">
-          <p class="eyebrow">Fretboard <span class="muted">· every place that note lives · tap to hear</span></p>
-          <div class="fb-tools">
-            <button class="btn ghost small" id="clear-trail" type="button">Clear trail</button>
-          </div>
-        </div>
-        <div class="fb-scroll"><div id="fretboard"></div></div>
-      </div>
-    </section>
-
-    <!-- Tuner -->
-    <section id="view-tuner" role="tabpanel" aria-labelledby="tab-tuner" class="view tuner idle" hidden>
-      <div class="card tuner-card">
-        <div id="gauge" class="gauge"></div>
-        <div class="tuner-readout">
-          <div class="big-note"><span id="tuner-note">—</span><sub id="tuner-octave"></sub></div>
-          <p id="tuner-hint" class="tuner-hint">Play any open string</p>
-          <p class="meta"><span id="tuner-hz"></span><span id="tuner-cents"></span></p>
-        </div>
-        <div class="trace" aria-hidden="true">
-          <span class="trace-label sharp-label">♯</span><span class="trace-label flat-label">♭</span>
-          <canvas id="tuner-trace"></canvas>
-        </div>
-        <div class="pill-row">
-          <button id="tuner-auto" class="btn ghost small" type="button" aria-pressed="true">Auto-detect string</button>
-          <div id="string-pills" class="pills"></div>
-        </div>
-        <p class="caption center">Let one string ring at a time. Tap a string to lock onto it and hear its reference pitch.</p>
-      </div>
-    </section>
-  </main>
-
-  <footer class="foot">Works in Chrome, Safari, Edge and Firefox. Play one note at a time, close to the mic.</footer>
 
   <script type="module" src="js/app.js"></script>
 </body>
