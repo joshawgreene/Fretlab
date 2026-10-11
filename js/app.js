@@ -90,6 +90,7 @@ $('#clear-trail').addEventListener('click', () => fretboard.clearTrail());
 // Tabs
 function setView(view) {
   state.view = view;
+  document.body.dataset.view = view;
   for (const v of ['fretboard', 'tuner']) {
     $(`#tab-${v}`).setAttribute('aria-selected', String(v === view));
     $(`#view-${v}`).hidden = v !== view;
@@ -98,6 +99,7 @@ function setView(view) {
 }
 $('#tab-fretboard').addEventListener('click', () => setView('fretboard'));
 $('#tab-tuner').addEventListener('click', () => setView('tuner'));
+$('#rotate-tuner').addEventListener('click', () => setView('tuner'));
 
 // Mic
 const micBtn = $('#mic-btn');
@@ -116,8 +118,32 @@ micBtn.addEventListener('click', async () => {
     }
   }
   micBtn.setAttribute('aria-pressed', String(listener.running));
-  $('#mic-label').textContent = listener.running ? 'Stop listening' : 'Start listening';
+  const label = listener.running ? 'Stop listening' : 'Start listening';
+  $('#mic-label').textContent = label;
+  micBtn.setAttribute('aria-label', label);
   document.body.classList.toggle('listening', listener.running);
+  if (listener.running) keepAwake(); else releaseWake();
+});
+
+// ---------- phones: keep the screen on while listening, recover after backgrounding ----------
+let wakeLock = null;
+async function keepAwake() {
+  try {
+    if ('wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch { /* not supported or refused (e.g. low battery): fine */ }
+}
+function releaseWake() {
+  wakeLock?.release().catch(() => {});
+  wakeLock = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && listener.running) {
+    listener.resume().catch(() => {}); // iOS suspends audio when the app is backgrounded or the screen locks
+    keepAwake(); // the wake lock is dropped whenever the page is hidden
+  }
 });
 
 function showBanner(msg) { const b = $('#banner'); b.textContent = msg; b.hidden = false; }
@@ -136,7 +162,7 @@ function onFrame(frame) {
   if (frame.active) {
     lastMidi = frame.midi;
     lastFrame = frame;
-    fretboard.show(frame.midi);
+    if (fretboard.show(frame.midi)) fretboard.revealCurrent();
   }
   showReadout(lastMidi, frame.active ? frame : lastFrame, !frame.active);
 }

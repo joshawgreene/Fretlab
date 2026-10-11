@@ -48,13 +48,31 @@ export class PitchListener {
     this.onFrame({ active: false, freq: null, midi: null, cents: 0, level: 0 });
   }
 
-  loop = () => {
+  /** Pick up again after the browser suspended audio (iOS does this when backgrounded). */
+  async resume() {
     if (!this.running) return;
+    const track = this.stream?.getAudioTracks()[0];
+    if (!track || track.readyState === 'ended') {
+      // The OS took the mic away (e.g. a phone call): start over.
+      this.stop();
+      await this.start();
+      return;
+    }
+    if (this.ctx.state !== 'running') await this.ctx.resume().catch(() => {});
+    cancelAnimationFrame(this.raf);
+    this.loop();
+  }
+
+  loop = (now = performance.now()) => {
+    if (!this.running) return;
+    this.raf = requestAnimationFrame(this.loop);
+    // ~40 analyses a second is plenty; skipping frames on 90/120 Hz phone screens saves battery.
+    if (now - (this.lastRun || 0) < 22) return;
+    this.lastRun = now;
     this.analyser.getFloatTimeDomainData(this.buf);
     const level = rms(this.buf);
     const est = level >= this.tracker.gate ? detectPitch(this.buf, this.ctx.sampleRate) : null;
     this.onFrame(this.tracker.push(est, level));
-    this.raf = requestAnimationFrame(this.loop);
   };
 
   /** Short plucked-string tone for a MIDI note (reference pitch / fretboard taps). */

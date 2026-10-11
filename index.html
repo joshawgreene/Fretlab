@@ -6,6 +6,12 @@
   <title>Fretlab — guitar practice</title>
   <meta name="description" content="See the notes you play on a live fretboard and stave, and tune to any tuning." />
   <meta name="theme-color" content="#08090a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Fretlab" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,18 +24,6 @@
       <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="6" width="26" height="20" rx="3"/><path d="M3 12h26M3 17h26M3 22h26M11 6v20M19 6v20"/><circle cx="15" cy="17" r="3"/></svg>
       <span>Fretlab</span>
     </div>
-    <div class="mic">
-      <div class="level" aria-hidden="true"><span id="level-bar"></span></div>
-      <button id="mic-btn" class="btn primary" type="button" aria-pressed="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-        <span id="mic-label">Start listening</span>
-      </button>
-    </div>
-  </header>
-
-  <div id="banner" class="banner" role="alert" hidden></div>
-
-  <main>
     <div class="controlbar">
       <div class="tabs" role="tablist" aria-label="Fretboard mode">
         <button role="tab" id="tab-fretboard" aria-controls="view-fretboard" aria-selected="true" type="button">Live fretboard</button>
@@ -43,9 +37,10 @@
         <details class="settings">
           <summary class="btn ghost" aria-label="Settings">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
-            <span>Settings</span>
+            <span class="label">Settings</span>
           </summary>
           <div class="settings-panel">
+            <label class="toggle"><input type="checkbox" id="names-toggle" /><span>Show all note names on the fretboard</span></label>
             <label class="field"><span>Note names</span>
               <select id="pref-select"><option value="sharp">Sharps (C♯)</option><option value="flat">Flats (D♭)</option><option value="auto">Match tuning</option></select>
             </label>
@@ -62,14 +57,31 @@
         </details>
       </div>
     </div>
+    <div class="mic">
+      <div class="level" aria-hidden="true"><span id="level-bar"></span></div>
+      <button id="mic-btn" class="btn primary" type="button" aria-pressed="false" aria-label="Start listening">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <span id="mic-label" class="label">Start listening</span>
+      </button>
+    </div>
+  </header>
 
-    <div id="custom-editor" class="custom-editor" hidden>
+  <div id="banner" class="banner" role="alert" hidden></div>
+
+  <main>
+  <div id="custom-editor" class="custom-editor" hidden>
       <p class="custom-title">Custom tuning <span>— string 6 is the low one</span></p>
       <div id="custom-strings" class="custom-strings"></div>
     </div>
 
     <!-- Live fretboard -->
     <section id="view-fretboard" role="tabpanel" aria-labelledby="tab-fretboard" class="view">
+      <div class="rotate-prompt">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><rect class="phone" x="22" y="8" width="20" height="36" rx="4"/><path class="arrow" d="M14 50a22 22 0 0 0 36 0"/><path class="arrow" d="M46 46l4 4-6 2"/></svg>
+        <p class="rotate-title">Turn your phone sideways</p>
+        <p class="rotate-text">The fretboard needs landscape to fit every fret on screen.</p>
+        <button class="btn ghost small" id="rotate-tuner" type="button">Use the tuner instead</button>
+      </div>
       <div class="readouts">
         <div class="card note-card" id="note-card">
           <p class="eyebrow">Note</p>
@@ -89,7 +101,6 @@
         <div class="fb-head">
           <p class="eyebrow">Fretboard <span class="muted">· every place that note lives · tap to hear</span></p>
           <div class="fb-tools">
-            <label class="toggle"><input type="checkbox" id="names-toggle" /><span>All note names</span></label>
             <button class="btn ghost small" id="clear-trail" type="button">Clear trail</button>
           </div>
         </div>
