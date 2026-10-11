@@ -3,15 +3,17 @@
 import { spell } from './notes.js';
 
 const STEP = 5; // half a line-gap, in SVG units
-const TOP_STEP = 46; // highest diatonic step that fits (written A6)
-const BOTTOM_STEP = 21; // lowest (written D3)
-const PAD = 12;
-const yOf = (step) => PAD + (TOP_STEP - step) * STEP;
 const BOTTOM_LINE = 30; // E4 = octave 4 * 7 + letter 2
 const LINES = [30, 32, 34, 36, 38];
-const WIDTH = 210;
-const HEIGHT = yOf(BOTTOM_STEP) + PAD;
-const NOTE_X = 140;
+
+// Normal: room for the full range. Compact (landscape phones): cropped tight to the clef and
+// written 8va a little sooner, so the staff can be drawn much bigger in a short space.
+const LAYOUTS = {
+  normal: { top: 46, bottom: 21, pad: 12, width: 210, noteX: 140, ottavaAbove: 44 },
+  compact: { top: 43, bottom: 21, pad: 5, width: 250, noteX: 165, ottavaAbove: 41 },
+};
+let L = LAYOUTS.normal;
+const yOf = (step) => L.pad + (L.top - step) * STEP;
 
 // Treble clef drawn as a single stroked spiral, sized for a 10-unit line gap.
 // Coordinates are relative to the top staff line (y=0) .. bottom line (y=40).
@@ -27,7 +29,10 @@ const CLEF = `
   C 33 32, 30 19, 21 19
   C 13 19, 11 29, 17 31`;
 
-export function renderStave(host, midi, pref = 'sharp') {
+export function renderStave(host, midi, pref = 'sharp', { compact = false } = {}) {
+  L = compact ? LAYOUTS.compact : LAYOUTS.normal;
+  const WIDTH = L.width, HEIGHT = yOf(L.bottom) + L.pad, NOTE_X = L.noteX;
+  const ledger = (y) => `<line class="st-ledger" x1="${NOTE_X - 13}" x2="${NOTE_X + 13}" y1="${y}" y2="${y}"/>`;
   let body = '';
   for (const s of LINES) body += `<line class="st-line" x1="6" x2="${WIDTH - 6}" y1="${yOf(s)}" y2="${yOf(s)}"/>`;
   body += `<line class="st-line" x1="6" x2="6" y1="${yOf(38)}" y2="${yOf(30)}"/>`;
@@ -40,8 +45,8 @@ export function renderStave(host, midi, pref = 'sharp') {
     let { letter, acc, octave } = spell(written, pref);
     let step = octave * 7 + letter;
     let ottava = false;
-    if (step > 44) { step -= 7; ottava = true; } // very high: notate down an octave with 8va
-    if (step < BOTTOM_STEP) step = BOTTOM_STEP; // below the guitar's range: clamp (shouldn't happen)
+    if (step > L.ottavaAbove) { step -= 7; ottava = true; } // very high: notate down an octave with 8va
+    if (step < L.bottom) step = L.bottom; // below the guitar's range: clamp (shouldn't happen)
     const y = yOf(step);
 
     // Ledger lines
@@ -52,7 +57,7 @@ export function renderStave(host, midi, pref = 'sharp') {
     body += `<g class="st-note" transform="translate(${NOTE_X} ${y}) rotate(-22)">
                <ellipse rx="7.2" ry="4.9"/><ellipse class="st-hole" rx="3.6" ry="2.2" transform="rotate(-40)"/></g>`;
     if (acc) body += `<text class="st-acc" x="${NOTE_X - 15}" y="${y}" dy="0.33em">${acc > 0 ? '♯' : '♭'}</text>`;
-    if (ottava) body += `<text class="st-8va" x="${NOTE_X - 14}" y="${yOf(46) + 2}">8va</text>`;
+    if (ottava) body += `<text class="st-8va" x="${NOTE_X + 15}" y="${yOf(L.top) + 9}">8va</text>`;
     label = ottava ? ' (written 8va)' : '';
   }
 
@@ -60,4 +65,3 @@ export function renderStave(host, midi, pref = 'sharp') {
     aria-label="Stave${label}">${body}</svg>`;
 }
 
-const ledger = (y) => `<line class="st-ledger" x1="${NOTE_X - 13}" x2="${NOTE_X + 13}" y1="${y}" y2="${y}"/>`;

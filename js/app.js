@@ -33,6 +33,11 @@ const currentTuning = () => {
 };
 const notePref = () => (state.pref === 'auto' ? currentTuning().pref : state.pref);
 
+// Phones in landscape always get the full neck; the "Frets shown" setting is for bigger screens.
+const phoneLandscape = window.matchMedia('(orientation: landscape) and (max-height: 500px)');
+const fretsShown = () => (phoneLandscape.matches ? 22 : state.frets);
+phoneLandscape.addEventListener('change', () => applyAll());
+
 // ---------- components ----------
 const listener = new PitchListener(onFrame);
 const fretboard = new Fretboard($('#fretboard'), { onTap: tapNote });
@@ -55,7 +60,7 @@ function applyAll() {
   $('#a4-out').textContent = state.a4;
   $('#sens-input').value = state.sensitivity;
   $('#names-toggle').checked = state.showNames;
-  fretboard.configure({ tuning: notes, frets: state.frets, pref, showNames: state.showNames });
+  fretboard.configure({ tuning: notes, frets: fretsShown(), pref, showNames: state.showNames });
   tuner.setTuning(notes, pref);
   renderCustomEditor();
   showReadout(lastMidi, lastFrame, !listener.running || !lastFrame?.active);
@@ -192,7 +197,7 @@ function showReadout(midi, frame, stale) {
   $('#note-cents').textContent = frame ? `${cents > 0 ? '+' : ''}${cents.toFixed(0)}¢` : '';
 
   // Everything below only changes when the note changes — skip DOM work otherwise.
-  const key = `${midi}|${pref}|${state.tuningId}|${state.custom}|${state.frets}`;
+  const key = `${midi}|${pref}|${state.tuningId}|${state.custom}|${fretsShown()}|${phoneLandscape.matches}`;
   if (key === lastReadoutKey) return;
   lastReadoutKey = key;
   if (midi === null) {
@@ -200,7 +205,7 @@ function showReadout(midi, frame, stale) {
     $('#note-oct').textContent = '';
     $('#note-enh').textContent = listener.running ? 'Play a single note' : 'Start listening, or tap the fretboard';
     $('#note-positions').textContent = '';
-    renderStave($('#stave'), null, pref);
+    renderStave($('#stave'), null, pref, { compact: phoneLandscape.matches });
     return;
   }
   $('#note-name').textContent = noteName(midi, pref);
@@ -210,10 +215,10 @@ function showReadout(midi, frame, stale) {
   const { notes } = currentTuning();
   const where = notes
     .map((open, i) => ({ string: 6 - i, fret: midi - open }))
-    .filter((p) => p.fret >= 0 && p.fret <= state.frets)
+    .filter((p) => p.fret >= 0 && p.fret <= fretsShown())
     .map((p) => (p.fret === 0 ? `string ${p.string} open` : `string ${p.string} fret ${p.fret}`));
   $('#note-positions').textContent = where.length ? where.join(' · ') : 'Not on the frets shown';
-  renderStave($('#stave'), midi, pref);
+  renderStave($('#stave'), midi, pref, { compact: phoneLandscape.matches });
 }
 
 // ---------- boot ----------

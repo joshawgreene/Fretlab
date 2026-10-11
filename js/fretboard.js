@@ -7,6 +7,7 @@ const STRING_GAP = 34;
 const PAD_Y = 22;
 const OPEN_ZONE = 58; // space left of the nut for open-string markers
 const FRET_LEN = 60;
+const FRET_LEN_LONG = 54; // used above 15 frets so a full neck keeps some height
 const INLAYS = [3, 5, 7, 9, 15, 17, 19, 21];
 const TRAIL_LENGTH = 1; // ghost only the previous note
 
@@ -51,7 +52,7 @@ export class Fretboard {
   }
 
   render() {
-    this.boardLen = this.frets * FRET_LEN;
+    this.boardLen = this.frets * (this.frets > 15 ? FRET_LEN_LONG : FRET_LEN);
     const width = OPEN_ZONE + this.boardLen + 14;
     const boardTop = PAD_Y - 14, boardBottom = this.stringY(0) + 14;
     const height = boardBottom + 28;
