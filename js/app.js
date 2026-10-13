@@ -1,4 +1,4 @@
-import { TUNINGS, parseNote, noteName, octaveOf, enharmonic, customNoteRange } from './notes.js';
+import { TUNINGS, parseNote, midiToFreq, noteName, octaveOf, enharmonic, customNoteRange } from './notes.js';
 import { PitchListener } from './audio.js';
 import { Fretboard } from './fretboard.js';
 import { renderStave } from './stave.js';
@@ -56,6 +56,7 @@ function applyAll() {
   const { notes } = currentTuning();
   const pref = notePref();
   listener.setSensitivity(state.sensitivity);
+  listener.tracker.minFreq = midiToFreq(Math.min(...notes)) * 0.94; // nothing below the lowest open string
   tuningSelect.value = state.tuningId;
   $('#sens-input').value = state.sensitivity;
   fretboard.configure({ tuning: notes, frets: FRETS, pref });
@@ -268,10 +269,10 @@ function renderLearn() {
     $('#learn-count').textContent = '';
     return;
   }
-  $('#learn-label').textContent = learn.index === 0 ? (listener.running ? 'Play' : 'Start listening, then play') : 'Next';
+  $('#learn-label').textContent = (learn.index === 0 ? (listener.running ? 'Play' : 'Listen, then play') : 'Next') + (t.root ? ' · root' : '');
   $('#learn-note').textContent = noteName(t.midi, pref);
   $('#learn-oct').textContent = octaveOf(t.midi);
-  $('#learn-where').textContent = `${t.f === 0 ? 'open' : `fret ${t.f}`} · string ${6 - t.s}${t.root ? ' · root' : ''}`;
+  $('#learn-where').textContent = `${t.f === 0 ? 'open' : `fret ${t.f}`} · string ${6 - t.s}`;
   $('#learn-count').textContent = `${learn.index + 1} of ${total}`;
   renderStave($('#stave'), t.midi, pref, { compact: staveCompact() });
 }

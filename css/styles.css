@@ -322,9 +322,23 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .note-card .freq, .tuner-readout .freq { grid-area: b; margin: 3px 0 0; font-size: 17px; flex-wrap: wrap; row-gap: 2px; align-self: start; }
   .freq .cents { flex-basis: 100%; margin-left: 0; font-size: 12px; }
   .mini-cents { grid-area: bar; margin-top: 8px; }
-  .learn-body { gap: 2px; }
-  .learn-where { font-size: 12px; }
-  .learn-count { margin-top: 3px; font-size: 11px; }
+  /* Learn readout, same shape as the note readout: target note left, details stacked right */
+  .learn-card {
+    display: grid; grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto auto auto 1fr auto;
+    grid-template-areas: "head head" "note ." "note label" "note where" "note count" "note ." "bar bar";
+    column-gap: 14px; align-items: center;
+  }
+  .learn-body, .learn-foot { display: contents; }
+  .learn-head { grid-area: head; }
+  .learn-body .big-note { grid-area: note; font-size: clamp(44px, 20vh, 80px); }
+  .learn-body .label { grid-area: label; font-size: 10px; }
+  .learn-where { grid-area: where; font-size: 13px; margin-top: 3px; }
+  .learn-count { grid-area: count; margin: 3px 0 0; font-size: 11px; }
+  .learn-card .progress { grid-area: bar; margin-top: 6px; height: 6px; }
+  .learn-head { gap: 5px; }
+  .learn-head .btn.icon { padding: 5px; }
+  .learn-head .picker > summary { padding: 5px 8px; gap: 4px; }
   .fb-card { padding: 4px 6px 2px; }
   .trace-mod { gap: 6px; }
   .pill { padding: 5px 2px; }

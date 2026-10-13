@@ -28,7 +28,7 @@ export class NoteTracker {
    * @param {number} level  frame RMS
    * @returns {{active:boolean, freq:number|null, midi:number|null, cents:number, level:number}}
    */
-  push(est, level) {
+  push(est, level, hint = {}) {
     // Once a note is sounding, keep following it as it fades: a quieter, slightly less clear
     // reading at the same pitch still counts. Low strings on small mics need this most.
     if (this.midi !== null && est && est.clarity >= SUSTAIN_CLARITY && level >= this.gate * SUSTAIN_LEVEL &&
@@ -57,7 +57,7 @@ export class NoteTracker {
     const nearest = Math.round(freqToMidi(this.median()));
     if (nearest === this.candidate) this.candidateCount++;
     else { this.candidate = nearest; this.candidateCount = 1; }
-    if (this.candidateCount >= CONFIRM_FRAMES) this.midi = nearest;
+    if (this.candidateCount >= (hint.confirm ?? CONFIRM_FRAMES)) this.midi = nearest;
     return this.snapshot(level);
   }
 

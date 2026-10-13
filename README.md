@@ -28,6 +28,7 @@ Push this folder to a GitHub repo and import it in Vercel. Framework preset: **O
 node tests/pitch.test.mjs   # note detector over C2–E6: almost never confidently wrong
 node tests/tuner.test.mjs   # tuner: accuracy through a string's decay, smooth peg-turn tracking, string switching
 node tests/lowstrings.test.mjs  # low notes as a laptop/phone mic hears them: weak fundamental, ringing strings, echo
+node tests/fluid.test.mjs   # fast low-string riffs, ringing strings, hammer-ons: how quickly each new note shows
 node tests/scales.test.mjs  # Learn mode: scale spelling, box shapes, neck paths
 ```
 
@@ -36,7 +37,7 @@ node tests/scales.test.mjs  # Learn mode: scale spelling, box shapes, neck paths
 | File | Job |
 |---|---|
 | `js/pitch.js` | YIN pitch detection (pure maths, testable in Node) |
-| `js/analysis.js` | One analysis step: samples in, note + tuner readings out (the tuner band-pass filters around the string and uses a longer window) |
+| `js/analysis.js` | One analysis step: samples in, note + tuner readings out. Notes: a fast (~34 ms) and a steady (~85 ms) reading, the fast one winning right after a pluck. Tuner: band-pass filtered around the string over a longer window |
 | `js/tracker.js` | `NoteTracker` turns raw detections into a steady current note; `TuneTracker` gives the tuner a continuous, glitch-free pitch that holds through the decay |
 | `js/audio.js` | Microphone input + analysis loop, and the plucked reference tone |
 | `js/notes.js` | Frequency ↔ note maths, spelling, the tuning presets |

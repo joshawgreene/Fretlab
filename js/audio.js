@@ -81,8 +81,8 @@ export class PitchListener {
   loop = (now = performance.now()) => {
     if (!this.running) return;
     this.raf = requestAnimationFrame(this.loop);
-    // ~40 analyses a second is plenty; skipping frames on 90/120 Hz phone screens saves battery.
-    if (now - (this.lastRun || 0) < 22) return;
+    // Up to ~60 analyses a second (every frame on a 60 Hz screen, every other frame at 120 Hz).
+    if (now - (this.lastRun || 0) < 15) return;
     this.lastRun = now;
     this.analyser.getFloatTimeDomainData(this.buf);
     const trackers = { notes: this.tracker, tune: this.tunerMode ? this.tuneTracker : undefined };
