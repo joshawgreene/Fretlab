@@ -24,7 +24,33 @@
     <!-- Fretboard + Learn: [stave | note or learn | controls] over the fretboard -->
     <div id="view-fretboard" class="view-group">
       <section class="mod mod-a stave-mod" aria-label="Stave">
+        <header class="stave-tools" id="stave-tools">
+          <button class="btn small" id="play-import" type="button" title="Open a MusicXML file">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M4 14v6h16v-6"/></svg><span>Import</span></button>
+          <span class="stave-tools-gap"></span>
+          <button class="btn icon" id="play-mic" type="button" aria-label="Start listening" title="Listen">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+          <button class="btn icon" id="play-wide" type="button" aria-pressed="false" aria-label="Full width" title="Full width: four bars at a time">
+            <svg class="grow-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>
+            <svg class="shrink-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6"/></svg></button>
+          <input type="file" id="play-file" hidden />
+        </header>
         <div id="stave"></div>
+        <div class="play-help" id="play-help" hidden>
+          <p class="play-help-title">Play a piece of music</p>
+          <p>Import a <b>MusicXML</b> file (<code>.musicxml</code>, <code>.mxl</code> or <code>.xml</code>) and play through it note by note.</p>
+          <ol>
+            <li><b>Already in a notation app?</b> MuseScore, Sibelius, Finale, Dorico, Guitar Pro: <i>File → Export → MusicXML</i>.</li>
+            <li><b>Got a PDF or a photo?</b> Scan it into MusicXML first, with MuseScore’s free PDF import (musescore.com/import), Audiveris, or an app such as PlayScore 2. Check the result in MuseScore, then export MusicXML.</li>
+            <li><b>Looking for music?</b> Many score sites offer MusicXML downloads.</li>
+          </ol>
+          <p class="play-help-note">Fretlab follows the top line of the music, chooses where to play each note on the neck, and ignores repeats for now.</p>
+          <div class="play-help-actions">
+            <button class="btn primary small" id="play-import-2" type="button">Import a file</button>
+            <button class="btn small" id="play-sample" type="button">Try a sample</button>
+            <button class="btn small" id="play-help-close" type="button" hidden>Back to the music</button>
+          </div>
+        </div>
       </section>
 
       <section class="mod mod-b note-card" id="note-card" aria-label="Note">
@@ -44,7 +70,11 @@
             <div class="picker-panel">
               <label class="field"><span>Key</span><select id="learn-root"></select></label>
               <label class="field"><span>Scale</span><select id="learn-scale"></select></label>
-              <label class="field"><span>Where on the neck</span><select id="learn-position"></select></label>
+              <label class="field"><span>Position</span><select id="learn-position"></select></label>
+              <label class="toggle"><input type="checkbox" id="learn-auto" /><span class="switch" aria-hidden="true"></span>
+                <span class="toggle-text">Auto position<small>Move to the next position after each run</small></span></label>
+              <label class="toggle"><input type="checkbox" id="learn-arp" /><span class="switch" aria-hidden="true"></span>
+                <span class="toggle-text">Arpeggio<small>Just the root, 3rd and 5th</small></span></label>
             </div>
           </details>
           <button class="btn icon" id="learn-hear" type="button" aria-label="Hear the scale" title="Hear it">
@@ -60,6 +90,37 @@
         <div class="learn-foot">
           <div class="progress" aria-hidden="true"><span id="learn-bar"></span></div>
           <p class="learn-count" id="learn-count"></p>
+        </div>
+      </section>
+
+      <section class="mod mod-b learn-card play-card" id="play-card" aria-label="Play">
+        <header class="mod-head learn-head">
+          <details class="picker" id="play-picker">
+            <summary class="btn small" aria-label="Piece and part">
+              <svg class="key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+              <span id="play-title">No piece yet</span>
+              <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+            <div class="picker-panel">
+              <p class="play-meta" id="play-meta"></p>
+              <label class="field" id="play-part-field" hidden><span>Part</span><select id="play-part"></select></label>
+              <button class="btn small" id="play-import-3" type="button">Import another file</button>
+              <button class="btn small" id="play-sample-2" type="button">Load the sample (Ode to Joy)</button>
+              <button class="btn small" id="play-help-btn" type="button">How to get a MusicXML file</button>
+            </div>
+          </details>
+          <button class="btn icon" id="play-hear" type="button" aria-label="Hear it" title="Hear it">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg></button>
+          <button class="btn icon" id="play-restart" type="button" aria-label="Start again" title="Start again">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg></button>
+        </header>
+        <div class="learn-body">
+          <p class="label" id="play-label">Play</p>
+          <div class="big-note"><span id="play-note">—</span><sub id="play-oct"></sub></div>
+          <p class="learn-where" id="play-where">Import a MusicXML file to start</p>
+        </div>
+        <div class="learn-foot">
+          <div class="progress" aria-hidden="true"><span id="play-bar"></span></div>
+          <p class="learn-count" id="play-count"></p>
         </div>
       </section>
 
@@ -115,6 +176,7 @@
       <div class="tabs" role="tablist" aria-label="Mode">
         <button role="tab" id="tab-fretboard" aria-controls="view-fretboard" aria-selected="true" type="button">Frets</button>
         <button role="tab" id="tab-learn" aria-controls="view-fretboard" aria-selected="false" type="button">Learn</button>
+        <button role="tab" id="tab-play" aria-controls="view-fretboard" aria-selected="false" type="button">Play</button>
         <button role="tab" id="tab-tuner" aria-controls="view-tuner" aria-selected="false" type="button">Tune</button>
       </div>
       <div class="ctrl-row">

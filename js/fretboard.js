@@ -54,6 +54,15 @@ export class Fretboard {
     this.paint();
   }
 
+  /** Play mode overlay: { target:{s,f}|null, next:{s,f}|null } or null. Only these two are shown. */
+  setPlay(play) {
+    const was = !!this.play;
+    this.play = play;
+    if (play) this.trail = [];
+    if (play && !was) this.hitAt = null;
+    this.paint();
+  }
+
   /** Brief "got it" flash on a position. */
   flash(s, f) {
     const p = this.positions?.find((q) => q.s === s && q.f === f);
@@ -171,7 +180,7 @@ export class Fretboard {
   /** In Learn mode: where on the neck this pitch most likely is, given the note we're waiting for. */
   nearestToTarget(midi) {
     const L = this.learn;
-    const t = L && L.path[Math.min(L.index, L.path.length - 1)];
+    const t = this.play ? this.play.target : L && L.path[Math.min(L.index, L.path.length - 1)];
     if (!t || midi === null) return null;
     let best = null, bestCost = Infinity;
     for (const p of this.positions || []) {
@@ -207,12 +216,17 @@ export class Fretboard {
     L?.path.forEach((n, i) => { if (n.midi > L.path[top].midi) top = i; });
     const segStart = L && L.index > top ? top : 0;
     const doneSet = new Set(L ? L.path.slice(segStart, L.index).map((n) => key(n.s, n.f)) : []);
+    const P = this.play;
+    const single = !!L || !!P; // Learn and Play light one square for the note played, not every place it lives
     this.svg?.classList.toggle('learning', !!L);
+    this.svg?.classList.toggle('playing', !!P);
     for (const p of this.positions) {
       const age = this.trail.indexOf(p.midi);
-      const isHit = p.midi === this.current && (!L || (!!this.hitAt && this.hitAt.s === p.s && this.hitAt.f === p.f));
+      const isHit = p.midi === this.current && (!single || (!!this.hitAt && this.hitAt.s === p.s && this.hitAt.f === p.f));
       p.g.classList.toggle('hit', isHit);
-      p.g.classList.toggle('trail', !L && p.midi !== this.current && age !== -1);
+      p.g.classList.toggle('trail', !single && p.midi !== this.current && age !== -1);
+      p.g.classList.toggle('play-target', !!P?.target && P.target.s === p.s && P.target.f === p.f);
+      p.g.classList.toggle('play-next', !!P?.next && P.next.s === p.s && P.next.f === p.f && !(P.target && P.target.s === p.s && P.target.f === p.f));
       if (age !== -1) p.g.style.setProperty('--age', age);
       const k = key(p.s, p.f);
       const inScale = !!L && L.pcs.has(((p.midi % 12) + 12) % 12);

@@ -18,7 +18,7 @@ const yOf = (step) => L.pad + (L.top - step) * STEP;
 // Treble clef: one thick round-capped stroke (stem rising into the loop, then down the loop's right side
 // and round the spiral), a short curl at the foot and a ball. Sized for a 10-unit line gap, with
 // coordinates relative to the top staff line (y=0) .. bottom line (y=40); the spiral circles the G line.
-const CLEF = 'M 15.8 51 L 16.3 1 C 16.5 -6, 21.5 -14.5, 25 -13 C 28.5 -11.5, 26.5 -2.5, 21.5 4.5 '
+export const CLEF = 'M 15.8 51 L 16.3 1 C 16.5 -6, 21.5 -14.5, 25 -13 C 28.5 -11.5, 26.5 -2.5, 21.5 4.5 '
   + 'C 17.5 10, 1 17.5, 0.8 30 C 0.6 40, 8.5 44.5, 15.5 44 C 23 43.5, 28 37.5, 27.4 31 '
   + 'C 26.8 23.5, 19.5 17.5, 13.2 21 C 8.2 24, 7.8 32, 11.8 35.2 '
   + 'M 15.8 51 C 15.6 56, 11.2 58.5, 7.6 56.6';

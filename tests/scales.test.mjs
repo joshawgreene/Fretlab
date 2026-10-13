@@ -1,5 +1,5 @@
 // Learn-mode scale logic. Run: node tests/scales.test.mjs
-import { SCALES, buildPath, positions, scalePcs, scaleSpelling, rootName, keyPref } from '../js/scales.js';
+import { SCALES, buildPath, positions, scalePcs, chordPcs, scaleSpelling, rootName, keyPref } from '../js/scales.js';
 import { parseNote, pitchClass } from '../js/notes.js';
 
 const STD = ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'].map(parseNote);
@@ -72,6 +72,24 @@ check(`All ${total} positions are ascending, in key, playable (≤ 6-fret stretc
   const ud = buildPath(STD, { rootPc: 7, scaleId: 'major', positionId: 'pos-1', direction: 'updown' });
   check('Up & down = up + back down, top note once', ud.length === up.length * 2 - 1 && ud.at(-1).midi === up[0].midi);
   check('Unknown position falls back to Position 1', buildPath(STD, { rootPc: 7, scaleId: 'major', positionId: 'box-3' })[0].midi === up[0].midi);
+}
+// 6. Arpeggios: the scale's own triad, within the chosen position
+{
+  const tri = (r, id) => [...chordPcs(r, id)].map((pc) => (pc - r + 12) % 12).sort((a, b) => a - b).join(',');
+  const want = { major: '0,4,7', minor: '0,3,7', 'major-pent': '0,4,7', 'minor-pent': '0,3,7', blues: '0,3,7', 'harmonic-minor': '0,3,7',
+    'melodic-minor': '0,3,7', dorian: '0,3,7', phrygian: '0,3,7', lydian: '0,4,7', mixolydian: '0,4,7', locrian: '0,3,6' };
+  const wrong = SCALES.filter((sc) => tri(2, sc.id) !== want[sc.id]).map((sc) => `${sc.id}=${tri(2, sc.id)}`);
+  check('Each scale\'s triad: major/minor third, perfect fifth (diminished in Locrian)', wrong.length === 0, wrong.join(' '));
+  let bad = 0, n = 0;
+  for (const sc of SCALES) for (let r = 0; r < 12; r++) for (const pos of positions(STD, r, sc.id)) {
+    n++;
+    const arp = buildPath(STD, { rootPc: r, scaleId: sc.id, positionId: pos.id, arpeggio: true, direction: 'up' });
+    const chord = chordPcs(r, sc.id);
+    const ok = arp.length >= 5 && arp.every((x, i) => chord.has(pitchClass(x.midi)) && pos.path.some((y) => y.s === x.s && y.f === x.f) && (i === 0 || x.midi > arp[i - 1].midi))
+      && pos.path.filter((x) => chord.has(pitchClass(x.midi))).length === arp.length;
+    if (!ok) bad++;
+  }
+  check(`Arpeggio in all ${n} positions: every chord tone in the shape, nothing else, ascending`, bad === 0, bad ? `${bad} bad` : '');
 }
 console.log(failed ? `${failed} failed` : 'All scale tests passed');
 process.exit(failed ? 1 : 0);

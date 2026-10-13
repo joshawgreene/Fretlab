@@ -2,8 +2,11 @@
 
 Guitar practice in the browser.
 
+Each mode has its own colour: Frets blue, Learn orange, Play green, Tune black and white.
+
 - **Fretboard** — play a note and see every place it lives on the neck, plus the note on a stave.
-- **Learn** — pick a key, scale and position (pentatonic boxes, three-notes-per-string shapes); the scale lights up orange and you play through it, up and back down.
+- **Learn** — pick a key, scale and position (pentatonic boxes, three-notes-per-string shapes); the scale lights up orange and you play through it, up and back down, round and round with the time of your last run. Options: *Auto position* (move to the next position after each run) and *Arpeggio* (just the root, 3rd and 5th). A blue marker appears only when you hold a wrong note.
+- **Play** — import a piece as MusicXML (`.musicxml`, `.mxl`, `.xml`) and play through it note by note: the stave shows one bar (or four, full width) with the next note in green; the fretboard shows where to play it and ghosts the note after. Fretlab picks the fingering, follows the top line of chords, and ignores repeats for now. Got a PDF or photo? Scan it to MusicXML first (MuseScore's PDF import, Audiveris, PlayScore 2). A sample piece (Ode to Joy) is in `samples/`.
 - **Tuner** — standard, alternate and custom tunings, with a live pitch trace.
 - **Metronome** — always on screen; accented downbeat, unpitched click so the note detector ignores it.
 
@@ -30,7 +33,9 @@ node tests/pitch.test.mjs   # note detector over C2–E6: almost never confident
 node tests/tuner.test.mjs   # tuner: accuracy through a string's decay, smooth peg-turn tracking, string switching
 node tests/lowstrings.test.mjs  # low notes as a laptop/phone mic hears them: weak fundamental, ringing strings, echo
 node tests/fluid.test.mjs   # fast low-string riffs, ringing strings, hammer-ons: how quickly each new note shows
-node tests/scales.test.mjs  # Learn mode: every scale's notes and spelling, the standard position shapes, all 936 positions playable
+node tests/scales.test.mjs  # Learn mode: every scale's notes and spelling, the standard position shapes, all 936 positions playable, arpeggios
+node tests/learn.test.mjs   # Learn mode at 80–160 BPM: how fast each step ticks off, nothing missed, no stray blue marker
+node tests/play.test.mjs    # Play mode: reading MusicXML/.mxl, fingering, repeated notes at tempo, held notes (with vibrato) counted once
 ```
 
 ## How it's organised
@@ -38,7 +43,7 @@ node tests/scales.test.mjs  # Learn mode: every scale's notes and spelling, the 
 | File | Job |
 |---|---|
 | `js/pitch.js` | YIN pitch detection (pure maths, testable in Node) |
-| `js/analysis.js` | One analysis step: samples in, note + tuner readings out. Notes: a fast (~34 ms) and a steady (~85 ms) reading, the fast one winning right after a pluck. Tuner: band-pass filtered around the string over a longer window |
+| `js/analysis.js` | One analysis step: samples in, note + tuner readings out. Notes: a fast (~34 ms) and a steady (~85 ms) reading, the fast one winning right after a pluck. In Learn and Play it also listens specifically for the note you're meant to play next (ticks it off sooner) and spots fresh picks, so a repeated note needs — and gets — its own pick. Tuner: band-pass filtered around the string over a longer window |
 | `js/tracker.js` | `NoteTracker` turns raw detections into a steady current note; `TuneTracker` gives the tuner a continuous, glitch-free pitch that holds through the decay |
 | `js/audio.js` | Microphone input + analysis loop, and the plucked reference tone |
 | `js/notes.js` | Frequency ↔ note maths, spelling, the tuning presets |
@@ -46,6 +51,9 @@ node tests/scales.test.mjs  # Learn mode: every scale's notes and spelling, the 
 | `js/stave.js` | SVG treble-clef-8 stave (guitar notation is written an octave above sounding pitch) |
 | `js/tuner.js` | Tuner gauge, pitch trace, string pills, auto/locked string targeting |
 | `js/scales.js` | Learn mode: scale definitions, letter-correct spelling, standard positions (pentatonic boxes, 3-notes-per-string, blues = box + ♭5) |
+| `js/musicxml.js` | Play mode: reads MusicXML (plain or zipped .mxl, no dependencies) into bars of notes in guitar terms |
+| `js/score-stave.js` | Play mode: draws one or four bars — clef, key/time signatures, notes, beams, ties, rests |
+| `js/fingering.js` | Play mode: picks a string and fret for every note, keeping the hand in one place as long as it can |
 | `js/metronome.js` | Metronome scheduled on the audio clock, accented downbeat |
 | `js/app.js` | Wires it all together; settings persist in localStorage |
 

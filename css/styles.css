@@ -1,4 +1,5 @@
-/* Fretlab — white, black rules, square corners. Blue = what you're playing. Orange = scales. */
+/* Fretlab — white, black rules, square corners. Each mode has its own colour (--accent):
+   Frets blue, Learn orange, Tune black and white. Blue (--played) always marks the note you're playing. */
 :root {
   --bg: #ffffff;
   --ink: #0b0b0b;           /* text, rules, frets, strings */
@@ -10,6 +11,8 @@
   --accent: #1f3bff;        /* cobalt: the note you're playing, in tune, selected */
   --accent-ink: #ffffff;
   --accent-soft: #e5e9ff;
+  --played: #1f3bff;        /* the note you're playing, whatever the mode */
+  --played-ink: #ffffff;
   --good: #1f3bff;
   --good-ink: #ffffff;
   --off: #8f8f8b;
@@ -38,6 +41,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 button, select, input { font: inherit; color: inherit; }
+
+/* Mode colours */
+body[data-view="learn"] { --accent: #ff7a00; --accent-ink: #0b0b0b; --accent-soft: #ffe2c2; --good: #ff7a00; }
+body[data-view="play"] { --accent: #0a9a4c; --accent-ink: #ffffff; --accent-soft: #c9efd8; --accent-ghost: #9fdcb8; --good: #0a9a4c; }
+body[data-view="tuner"] { --accent: #0b0b0b; --accent-ink: #ffffff; --accent-soft: #f1f1ef; --good: #0b0b0b; }
 button, summary, select, .pos, .pill { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
 svg { display: block; }
@@ -61,7 +69,12 @@ svg { display: block; }
 .mod-m { grid-column: 3; grid-row: 1; }
 .mod-c { grid-column: 4; grid-row: 1; }
 .mod-board { grid-column: 1 / -1; grid-row: 2; }
-body[data-view="fretboard"] .learn-card, body[data-view="learn"] .note-card { display: none; }
+body:not([data-view="learn"]) #learn-card, body:not([data-view="play"]) #play-card,
+body:is([data-view="learn"], [data-view="play"]) #note-card { display: none; }
+body:not([data-view="play"]) :is(.stave-tools, .play-help) { display: none !important; }
+/* Play, full width: the stave takes the whole top row (Listen and full-width toggle live in its toolbar) */
+body.wide[data-view="play"] .stave-mod { grid-column: 1 / -1; }
+body.wide[data-view="play"] :is(#play-card, .metro, .controls) { display: none; }
 .rotate-prompt { display: none; }
 
 .mod-head {
@@ -104,10 +117,10 @@ select {
 input[type="range"] { accent-color: var(--ink); width: 100%; }
 
 .controls { gap: 8px; }
-.tabs { display: grid; grid-template-columns: repeat(3, 1fr); border: 2px solid var(--ink); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border: 2px solid var(--ink); }
 .tabs button { border: 0; background: transparent; padding: 7px 4px; cursor: pointer; font-weight: 700; font-size: 13px; font-stretch: 105%; color: var(--ink); }
 .tabs button + button { border-left: 2px solid var(--ink); }
-.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
 .ctrl-row { display: flex; gap: 8px; align-items: stretch; }
 /* Mic sensitivity */
 .sens { display: flex; align-items: center; gap: 10px; font: 700 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -181,6 +194,17 @@ details > summary::-webkit-details-marker { display: none; }
 #mini-needle { position: absolute; left: 50%; top: -4px; width: 4px; height: 16px; margin-left: -2px; background: var(--ink); transition: transform .08s linear; }
 .in-tune #mini-needle { background: var(--accent); }
 
+/* On/off switches in the scale picker */
+.toggle { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; cursor: pointer; }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.toggle .switch { position: relative; width: 38px; height: 22px; border: 2px solid var(--ink); background: var(--surface); }
+.toggle .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: var(--ink); transition: transform .12s; }
+.toggle input:checked + .switch { background: var(--ink); }
+.toggle input:checked + .switch::after { background: var(--bg); transform: translateX(16px); }
+.toggle input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggle-text { display: grid; gap: 2px; font-weight: 800; font-size: 14px; font-stretch: 105%; }
+.toggle-text small { font-weight: 500; font-size: 12px; color: var(--muted); font-stretch: 100%; }
+
 /* Learn module */
 .learn-head { justify-content: flex-start; gap: 6px; text-transform: none; letter-spacing: 0; font: inherit; margin-bottom: 0; }
 .learn-head .picker { flex: 1; min-width: 0; }
@@ -189,12 +213,41 @@ details > summary::-webkit-details-marker { display: none; }
 .picker .key-icon { display: none; }
 .learn-body { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; gap: 6px; }
 .learn-body .big-note { color: var(--scale); }
-.learn-card.finished .learn-body .big-note { color: var(--accent); }
 .learn-where { margin: 0; font-weight: 700; font-stretch: 110%; }
 .progress { height: 8px; background: var(--surface-2); overflow: hidden; }
 .progress span { display: block; height: 100%; background: var(--scale); transform: scaleX(0); transform-origin: left; transition: transform .15s; }
-.learn-card.finished .progress span { background: var(--accent); }
+/* end of a run: the progress bar flashes, then straight round again */
+.learn-card.lap .progress { animation: lap .7s steps(1, end); }
+@keyframes lap { 0%, 60% { background: var(--ink); } }
 .learn-count { margin: 6px 0 0; font: 600 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Play: stave toolbar, help, fretboard */
+.stave-tools { display: flex; align-items: center; gap: 6px; flex: none; margin: -2px 0 6px; }
+.stave-tools-gap { flex: 1; }
+.stave-tools .btn.small { gap: 6px; }
+#play-mic { display: none; }
+body.wide #play-mic { display: inline-flex; }
+body.listening #play-mic { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#play-wide .shrink-icon, body.wide #play-wide .grow-icon { display: none; }
+body.wide #play-wide .shrink-icon { display: block; }
+body[data-view="play"].has-piece .stave-mod #stave { cursor: default; }
+.play-help { flex: 1; min-height: 0; overflow-y: auto; font-size: 13px; line-height: 1.45; }
+.play-help p { margin: 0 0 8px; }
+.play-help-title { font-weight: 900; font-size: 18px; font-stretch: 115%; }
+.play-help ol { margin: 0 0 8px; padding-left: 18px; display: grid; gap: 5px; }
+.play-help code { font: 600 12px var(--mono); }
+.play-help-note { color: var(--muted); font-size: 12px; }
+.play-help-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.play-meta { margin: 0; font-size: 13px; color: var(--muted); }
+.play-meta b { color: var(--ink); display: block; font-size: 15px; }
+.picker-panel > .btn.small { justify-content: flex-start; }
+#play-card .big-note { color: var(--accent); }
+#play-card .progress span { background: var(--accent); }
+#play-card .big-note:has(#play-note:empty) { display: none; }
+.pos.play-target rect { opacity: 1; fill: var(--accent); stroke: var(--ink); stroke-width: 3.5; transform: scale(1.22); }
+.pos.play-target text { opacity: 1; fill: var(--accent-ink); }
+.pos.play-next rect { opacity: 1; fill: var(--accent-ghost); stroke: none; }
+.pos.play-next text { opacity: 1; fill: #1d5a37; }
 
 /* Stave */
 .stave-mod #stave { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
@@ -207,6 +260,28 @@ details > summary::-webkit-details-marker { display: none; }
 .st-note .st-hole { fill: var(--surface); }
 body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
 .st-acc { fill: var(--ink); font: 22px var(--display); text-anchor: middle; }
+/* Play: bars of a piece. Notes use currentColor so a whole note (head, stem, flag) takes its state colour. */
+.score-svg { color: var(--ink); }
+.sc-note { color: var(--ink); }
+.sc-note.done { color: #b9b9b4; }
+.sc-note.cur { color: var(--accent); }
+.sc-note.next { color: var(--accent-ghost, #9adbb4); }
+.sc-head { fill: currentColor; }
+.sc-head.hollow { fill: none; stroke: currentColor; stroke-width: 2; }
+.sc-stem, .sc-ledger { stroke: currentColor; stroke-width: 1.4; }
+.sc-ledger { stroke: var(--ink); stroke-width: 1.2; }
+.sc-flag, .sc-dot, .sc-rest { fill: currentColor; }
+.sc-rest-stroke { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.sc-acc { fill: currentColor; font: 19px var(--display); text-anchor: middle; }
+.sc-beam { fill: var(--ink); }
+.sc-beam.done { fill: #b9b9b4; }
+.sc-tie { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.sc-tie.done { stroke: #b9b9b4; }
+.sc-tie.cur { stroke: var(--accent); }
+.sc-final { fill: var(--ink); }
+.sc-time { fill: var(--ink); font: 900 21px/1 var(--display); font-stretch: 110%; text-anchor: middle; }
+.sc-key { font-size: 19px; }
+.sc-barnum { fill: var(--muted); font: 700 9px var(--mono); }
 .st-8va { fill: var(--muted); font: italic 700 11px var(--display); }
 
 /* ---------- fretboard ---------- */
@@ -239,17 +314,18 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
 .pos.target text { fill: var(--scale-ink); }
 @keyframes target { 50% { stroke-width: 1.5; } }
 .pos.correct rect { animation: correct .45s ease-out; }
-@keyframes correct { 0% { fill: var(--accent); transform: scale(1.5); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes correct { 0% { fill: var(--ink); transform: scale(1.5); opacity: 1; } 100% { transform: scale(1); } }
 
 /* The note you're playing */
-.pos.trail rect { opacity: 1; fill: var(--accent-soft); stroke: none; }
-.pos.trail text { opacity: 1; fill: var(--accent); }
-.pos.hit rect { opacity: 1; fill: var(--accent); stroke: none; transform: scale(1.12); animation: none; }
-.pos.hit text { opacity: 1; fill: var(--accent-ink); }
+.pos.trail rect { opacity: 1; fill: #e5e9ff; stroke: none; }
+.pos.trail text { opacity: 1; fill: var(--played); }
+.pos.hit rect { opacity: 1; fill: var(--played); stroke: none; transform: scale(1.12); animation: none; }
+.pos.hit text { opacity: 1; fill: var(--played-ink); }
 .in-tune .pos.hit rect { fill: var(--ink); }
 .stale .pos.hit rect { transform: none; }
 .learning .pos.hit:not(.scale) rect { outline: none; stroke: var(--ink); stroke-width: 2; }   /* off the scale: blue, outlined */
 .learning.stale .pos.hit rect { opacity: .5; }
+.playing .pos.hit rect { stroke: var(--ink); stroke-width: 2; }   /* a wrong note in Play: blue, outlined */
 
 /* ---------- tuner ---------- */
 .gauge { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
@@ -269,9 +345,10 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
 .tuner-readout { transition: opacity .3s; }
 .tuner.held .tuner-readout { opacity: .55; }
 .tuner-readout .big-note { margin-top: auto; }
-.tuner.in-tune .tuner-readout .big-note { color: var(--accent); }
+.tuner.in-tune .tuner-readout { background: var(--ink); color: var(--bg); }
+.tuner.in-tune .tuner-readout .freq .unit, .tuner.in-tune .tuner-readout .freq .cents, .tuner.in-tune .tuner-readout .big-note sub { color: #bdbdb8; }
 .tuner-hint { margin: 10px 0 auto; font-weight: 800; font-stretch: 115%; font-size: clamp(16px, 2.6vh, 22px); text-transform: uppercase; }
-.tuner.in-tune .tuner-hint { color: var(--accent); }
+
 .tuner-readout .freq { margin-top: 8px; }
 .trace-mod { gap: 10px; }
 .trace { position: relative; flex: 1; min-height: 60px; background: var(--surface); border: 2px solid var(--ink); }
@@ -316,10 +393,10 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .metro-bpm { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 6px; }
   .metro-bpm span { font-size: 40px; }
   .metro-row { width: 150px; }
-  body:is([data-view="fretboard"], [data-view="learn"]) .metro { display: none; }
-  body:is([data-view="fretboard"], [data-view="learn"]) #view-fretboard > .mod:not(.rotate-prompt) { display: none; }
-  body:is([data-view="fretboard"], [data-view="learn"]) .rotate-prompt { display: flex; align-items: center; text-align: center; justify-content: center; padding: 48px 24px; }
-  body:is([data-view="fretboard"], [data-view="learn"]) .app { grid-template-rows: auto 1fr; }
+  body:is([data-view="fretboard"], [data-view="learn"], [data-view="play"]) .metro { display: none; }
+  body:is([data-view="fretboard"], [data-view="learn"], [data-view="play"]) #view-fretboard > .mod:not(.rotate-prompt) { display: none; }
+  body:is([data-view="fretboard"], [data-view="learn"], [data-view="play"]) .rotate-prompt { display: flex; align-items: center; text-align: center; justify-content: center; padding: 48px 24px; }
+  body:is([data-view="fretboard"], [data-view="learn"], [data-view="play"]) .app { grid-template-rows: auto 1fr; }
   .gauge-mod { height: 240px; }
   .tuner-readout .big-note { font-size: 72px; }
   .tuner-readout .tuner-hint { margin-bottom: 8px; }
@@ -386,6 +463,16 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
 }
 
 /* ---------- small landscape phones (iPhone SE and similar) ---------- */
+@media (orientation: landscape) and (max-height: 500px) {
+  .play-help { font-size: 11.5px; line-height: 1.4; }
+  .play-help-title { font-size: 14px; }
+  .play-help ol { gap: 3px; }
+  .play-help-note { font-size: 11px; }
+  .stave-tools { margin-bottom: 2px; }
+  .stave-tools .btn.small { padding: 4px 7px; font-size: 12px; }
+  .stave-tools .btn.icon { padding: 4px; }
+  .stave-tools .btn svg { width: 15px; height: 15px; }
+}
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 720px) {
   .app { --metro-w: 96px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) var(--metro-w) 156px; }
   .tabs button { font-size: 12px; }
@@ -399,5 +486,8 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .learn-head .picker { flex: none; }
   .learn-head .picker > summary { width: auto; padding: 5px; }
   .picker .key-icon { display: block; width: 15px; height: 15px; }
-  .picker #learn-title, .picker .chev { display: none; }
+  .picker #learn-title, .picker #play-title, .picker .chev { display: none; }
+  .tabs button { font-size: 11px; padding: 6px 1px; letter-spacing: -.01em; }
+  .stave-tools #play-import span { display: none; }
+  .count-extra { display: none; }
 }

@@ -137,9 +137,21 @@ function addBlueNotes(path, tuning, rootPc, blueStep, frets) {
  * @param {number[]} tuning  open-string MIDI notes, low → high
  * @param {{rootPc:number, scaleId:string, positionId:string, frets:number, direction:'up'|'updown'}} o
  */
-export function buildPath(tuning, { rootPc, scaleId, positionId, frets = 22, direction = 'updown' }) {
+export function buildPath(tuning, { rootPc, scaleId, positionId, frets = 22, direction = 'updown', arpeggio = false }) {
   const all = positions(tuning, rootPc, scaleId, frets);
   const pos = all.find((p) => p.id === positionId) || all[0];
-  const up = pos ? pos.path : [];
+  let up = pos ? pos.path : [];
+  if (arpeggio) { const chord = chordPcs(rootPc, scaleId); up = up.filter((n) => chord.has(pitchClass(n.midi))); }
   return direction === 'updown' ? [...up, ...up.slice(0, -1).reverse()] : up;
+}
+
+/**
+ * The scale's own triad (root, third, fifth) for arpeggio practice: the scale's major or minor third,
+ * and its perfect fifth (diminished in Locrian, where there is no perfect fifth).
+ */
+export function chordPcs(rootPc, scaleId) {
+  const st = scaleById(scaleId).steps;
+  const third = st.includes(4) ? 4 : 3;
+  const fifth = st.includes(7) ? 7 : 6;
+  return new Set([0, third, fifth].map((x) => pitchClass(rootPc + x)));
 }
