@@ -89,6 +89,12 @@ export class PitchListener {
     this.onFrame(analyseFrame(this.buf, this.ctx.sampleRate, trackers, now));
   };
 
+  /** The shared audio context (made on first use). */
+  audioContext() {
+    this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
+    return this.ctx;
+  }
+
   /** Short plucked-string tone for a MIDI note (reference pitch / fretboard taps). */
   pluck(midi, seconds = 1.8) {
     this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();

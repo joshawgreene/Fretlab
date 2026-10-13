@@ -64,7 +64,8 @@ export class Fretboard {
     setTimeout(() => p.g.classList.remove('correct'), 450);
   }
 
-  configure({ tuning, frets, pref, showNames }) {
+  configure({ tuning, frets, pref, showNames, label }) {
+    if (label !== undefined) this.label = label;
     if (tuning) this.tuning = tuning;
     if (frets) this.frets = frets;
     if (pref) this.pref = pref;
@@ -142,7 +143,7 @@ export class Fretboard {
         const cx = f === 0 ? openX : (this.fretX(f - 1) + this.fretX(f)) / 2;
         const g = el('g', { class: f === 0 ? 'pos open' : 'pos', transform: `translate(${cx.toFixed(1)} ${this.stringY(s).toFixed(1)})` }, svg);
         el('rect', { x: -size / 2, y: -size / 2, width: size, height: size }, g);
-        el('text', { dy: '0.36em' }, g).textContent = noteName(midi, this.pref);
+        el('text', { dy: '0.36em' }, g).textContent = this.label ? this.label(midi) : noteName(midi, this.pref);
         g.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onTap?.(midi, s, f); });
         this.positions.push({ s, f, midi, g });
       }

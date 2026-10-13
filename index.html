@@ -37,8 +37,10 @@
       <section class="mod mod-b learn-card" id="learn-card" aria-label="Learn">
         <header class="mod-head learn-head">
           <details class="picker" id="learn-picker">
-            <summary class="btn small"><span id="learn-title">C major</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+            <summary class="btn small" aria-label="Choose key, scale and position">
+              <svg class="key-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="12" r="4"/><path d="M11.5 12H21M17 12v3.5M20 12v2.5"/></svg>
+              <span id="learn-title">C major</span>
+              <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
             <div class="picker-panel">
               <label class="field"><span>Key</span><select id="learn-root"></select></label>
               <label class="field"><span>Scale</span><select id="learn-scale"></select></label>
@@ -93,6 +95,20 @@
         </div>
       </section>
     </div>
+
+    <!-- Metronome (shared by every view) -->
+    <section class="mod mod-m metro" id="metro" aria-label="Metronome">
+      <div class="metro-beats" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <button class="metro-bpm" id="metro-bpm" type="button" title="Tap to start or stop" aria-label="Start metronome">
+        <span id="metro-value">80</span><small>BPM</small>
+      </button>
+      <div class="metro-row">
+        <button class="btn icon" id="metro-down" type="button" aria-label="Slower"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <button class="btn icon" id="metro-play" type="button" aria-label="Start metronome" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="play" d="M7 4v16l13-8z"/><path class="stop" d="M6 6h12v12H6z"/></svg></button>
+        <button class="btn icon" id="metro-up" type="button" aria-label="Faster"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg></button>
+      </div>
+    </section>
 
     <!-- Controls (shared by every view) -->
     <section class="mod mod-c controls" aria-label="Controls">

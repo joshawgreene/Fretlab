@@ -1,15 +1,17 @@
-// Scales for Learn mode: which notes, where they sit on the neck, and the order to play them.
-// Pure logic (no DOM) so it can be tested in Node.
+// Scales for Learn mode: which notes, how they're spelled, the standard positions on the neck,
+// and the order to play them. Pure logic (no DOM) so it can be tested in Node.
 import { pitchClass } from './notes.js';
 
-// `parent` = semitones from this scale's root up to the root of the major key it borrows its key
-// signature from — used to choose sharps or flats (F major → B♭, E minor → F♯, …).
+// steps: semitones above the root.
+// parent: semitones from this scale's root up to the major key it takes its key signature from
+//         (decides sharps or flats: F major → B♭, E minor → F♯, D dorian → no accidentals …).
+// letters: which letter (counting from the root's letter, 0–6) each step is written with.
 export const SCALES = [
   { id: 'major', name: 'Major', steps: [0, 2, 4, 5, 7, 9, 11], parent: 0 },
   { id: 'minor', name: 'Natural minor', steps: [0, 2, 3, 5, 7, 8, 10], parent: 3 },
-  { id: 'major-pent', name: 'Major pentatonic', steps: [0, 2, 4, 7, 9], parent: 0 },
-  { id: 'minor-pent', name: 'Minor pentatonic', steps: [0, 3, 5, 7, 10], parent: 3 },
-  { id: 'blues', name: 'Blues', steps: [0, 3, 5, 6, 7, 10], parent: 3 },
+  { id: 'major-pent', name: 'Major pentatonic', steps: [0, 2, 4, 7, 9], parent: 0, letters: [0, 1, 2, 4, 5] },
+  { id: 'minor-pent', name: 'Minor pentatonic', steps: [0, 3, 5, 7, 10], parent: 3, letters: [0, 2, 3, 4, 6] },
+  { id: 'blues', name: 'Blues', steps: [0, 3, 5, 6, 7, 10], parent: 3, letters: [0, 2, 3, 4, 4, 6], blueNote: 6 },
   { id: 'harmonic-minor', name: 'Harmonic minor', steps: [0, 2, 3, 5, 7, 8, 11], parent: 3 },
   { id: 'melodic-minor', name: 'Melodic minor', steps: [0, 2, 3, 5, 7, 9, 11], parent: 3 },
   { id: 'dorian', name: 'Dorian', steps: [0, 2, 3, 5, 7, 9, 10], parent: 10 },
@@ -26,7 +28,10 @@ export const ROOTS = [
   { pc: 9, sharp: 'A', flat: 'A' }, { pc: 10, sharp: 'A♯', flat: 'B♭' }, { pc: 11, sharp: 'B', flat: 'B' },
 ];
 
-const FLAT_MAJOR_KEYS = new Set([5, 10, 3, 8, 1]); // F B♭ E♭ A♭ D♭ (G♭/F♯ goes sharp)
+const LETTERS = 'CDEFGAB';
+const NATURAL_PC = [0, 2, 4, 5, 7, 9, 11];
+const ACC = { '-2': '𝄫', '-1': '♭', 0: '', 1: '♯', 2: '𝄪' };
+const FLAT_MAJOR_KEYS = new Set([5, 10, 3, 8, 1]); // F B♭ E♭ A♭ D♭ (G♭/F♯ is written as F♯)
 
 export const scaleById = (id) => SCALES.find((s) => s.id === id) || SCALES[0];
 
@@ -40,83 +45,101 @@ export function rootName(rootPc, scaleId) {
   return keyPref(rootPc, scaleId) === 'flat' ? r.flat : r.sharp;
 }
 
+/**
+ * How each note of the scale is written: every degree gets its own letter (so D harmonic minor
+ * has C♯, not D♭; A blues has E♭ as the flat fifth).
+ * @returns {Map<number, {letter:number, acc:number, name:string}>}  pitch class → spelling
+ */
+export function scaleSpelling(rootPc, scaleId) {
+  const sc = scaleById(scaleId);
+  const rootLetter = LETTERS.indexOf(rootName(rootPc, scaleId)[0]);
+  const letters = sc.letters || sc.steps.map((_, i) => i);
+  const out = new Map();
+  sc.steps.forEach((st, i) => {
+    const pc = pitchClass(rootPc + st);
+    const letter = (rootLetter + letters[i]) % 7;
+    const acc = ((pc - NATURAL_PC[letter] + 18) % 12) - 6;
+    out.set(pc, { letter, acc, name: LETTERS[letter] + ACC[acc] });
+  });
+  return out;
+}
+
 /** Set of pitch classes in the scale. */
 export function scalePcs(rootPc, scaleId) {
   return new Set(scaleById(scaleId).steps.map((st) => pitchClass(rootPc + st)));
 }
 
 /**
- * Places to play the scale: the whole neck, plus a 5-fret box starting one fret below each
- * root on the two low strings (and the open position).
- * @returns {{id:string, label:string, start:number|null}[]}
+ * The standard positions for this scale, Position 1 starting on the root on the low string:
+ *  - pentatonic scales: the five box shapes, two notes per string
+ *  - seven-note scales: the seven three-notes-per-string shapes
+ *  - blues: the minor pentatonic boxes with the flat fifth added where it falls in the box
+ * @returns {{id:string, label:string, path:{s:number,f:number,midi:number,root:boolean}[]}[]}
  */
-export function positions(tuning, rootPc, frets) {
-  const starts = new Set([0]);
-  for (const open of [tuning[0], tuning[1]]) {
-    for (let f = 0; f <= frets; f++) {
-      if (pitchClass(open + f) === pitchClass(rootPc)) {
-        const st = Math.max(0, f - 1);
-        if (st + 4 <= frets) starts.add(st);
-      }
+export function positions(tuning, rootPc, scaleId, frets = 22) {
+  const sc = scaleById(scaleId);
+  const shapeSteps = sc.blueNote !== undefined ? sc.steps.filter((s) => s !== sc.blueNote) : sc.steps;
+  const perString = shapeSteps.length <= 5 ? 2 : 3;
+  const rootFret = ((pitchClass(rootPc) - pitchClass(tuning[0])) + 12) % 12;
+  const out = [];
+  shapeSteps.forEach((step, k) => {
+    let start = rootFret + step;
+    if (start > 12) start -= 12; // keep every position within reach on the neck
+    const path = buildShape(tuning, rootPc, shapeSteps, tuning[0] + start, perString, frets);
+    if (sc.blueNote !== undefined) addBlueNotes(path, tuning, rootPc, sc.blueNote, frets);
+    if (path.length < shapeSteps.length) return;
+    const fs = path.map((n) => n.f);
+    out.push({ id: `pos-${k + 1}`, label: `Position ${k + 1} · frets ${Math.min(...fs)}–${Math.max(...fs)}`, path });
+  });
+  return out;
+}
+
+function buildShape(tuning, rootPc, steps, startMidi, perString, frets) {
+  const pcs = new Set(steps.map((st) => pitchClass(rootPc + st)));
+  const path = [];
+  let s = 0, onString = 0;
+  for (let m = startMidi; ; m++) {
+    if (!pcs.has(pitchClass(m))) continue;
+    let fret = m - tuning[s];
+    if (onString >= perString && s + 1 < tuning.length) {
+      const next = m - tuning[s + 1];
+      if (next >= 0) { s++; onString = 0; fret = next; } // move up a string unless that would need a fret below the nut
+    } else if (onString >= perString) break; // top string is full
+    if (fret > frets) break;
+    path.push({ s, f: fret, midi: m, root: pitchClass(m) === pitchClass(rootPc) });
+    onString++;
+    if (s === tuning.length - 1 && onString >= perString) break;
+  }
+  return path;
+}
+
+/** Blues: drop the flat fifth into the box, on the string where it sits inside the box's fret span. */
+function addBlueNotes(path, tuning, rootPc, blueStep, frets) {
+  const blue = pitchClass(rootPc + blueStep);
+  const sorted = [...path].sort((a, b) => a.midi - b.midi);
+  const lo = sorted[0].midi, hi = sorted[sorted.length - 1].midi;
+  const fs = sorted.map((n) => n.f);
+  const minF = Math.min(...fs) - 1, maxF = Math.max(...fs) + 1;
+  for (let m = lo; m <= hi; m++) {
+    if (pitchClass(m) !== blue) continue;
+    const below = [...sorted].reverse().find((n) => n.midi < m);
+    // Prefer the string of the note just below it, then the next string up.
+    for (const s of [below.s, below.s + 1]) {
+      const f = m - tuning[s];
+      if (s < tuning.length && f >= Math.max(0, minF) && f <= Math.min(frets, maxF)) { path.push({ s, f, midi: m, root: false }); break; }
     }
   }
-  const boxes = [...starts].sort((a, b) => a - b).map((st) => ({
-    id: `box-${st}`, start: st,
-    label: st === 0 ? 'Open position (frets 0–4)' : `Frets ${st}–${st + 4}`,
-  }));
-  return [{ id: 'neck', start: null, label: 'Two octaves along the neck' }, ...boxes];
+  path.sort((a, b) => a.midi - b.midi);
 }
 
 /**
  * The notes to play, in order.
  * @param {number[]} tuning  open-string MIDI notes, low → high
  * @param {{rootPc:number, scaleId:string, positionId:string, frets:number, direction:'up'|'updown'}} o
- * @returns {{s:number, f:number, midi:number, root:boolean}[]}
  */
-export function buildPath(tuning, { rootPc, scaleId, positionId, frets, direction }) {
-  const pcs = scalePcs(rootPc, scaleId);
-  const isRoot = (m) => pitchClass(m) === pitchClass(rootPc);
-  let up;
-  const box = /^box-(\d+)$/.exec(positionId);
-  if (box) {
-    const start = Number(box[1]);
-    const lo = start, hi = Math.min(frets, start + 4);
-    const byPitch = new Map();
-    for (let s = 0; s < tuning.length; s++) {
-      for (let f = lo; f <= hi; f++) {
-        const m = tuning[s] + f;
-        if (!pcs.has(pitchClass(m))) continue;
-        // Same pitch on two strings: take the higher string (lower fret), like a standard box shape.
-        const prev = byPitch.get(m);
-        if (!prev || s > prev.s) byPitch.set(m, { s, f, midi: m, root: isRoot(m) });
-      }
-    }
-    up = [...byPitch.values()].sort((a, b) => a.midi - b.midi);
-  } else {
-    up = neckPath(tuning, pcs, rootPc, frets, isRoot);
-  }
+export function buildPath(tuning, { rootPc, scaleId, positionId, frets = 22, direction = 'updown' }) {
+  const all = positions(tuning, rootPc, scaleId, frets);
+  const pos = all.find((p) => p.id === positionId) || all[0];
+  const up = pos ? pos.path : [];
   return direction === 'updown' ? [...up, ...up.slice(0, -1).reverse()] : up;
-}
-
-/** Two octaves upward from the lowest root, moving along the neck by the nearest fingering. */
-function neckPath(tuning, pcs, rootPc, frets, isRoot) {
-  const spots = [];
-  for (let s = 0; s < tuning.length; s++) for (let f = 0; f <= frets; f++) spots.push({ s, f, midi: tuning[s] + f });
-  const low = spots.filter((p) => isRoot(p.midi)).sort((a, b) => a.midi - b.midi)[0];
-  if (!low) return [];
-  const top = low.midi + 24;
-  const out = [{ ...low, root: true }];
-  let cur = low;
-  for (let m = low.midi + 1; m <= top; m++) {
-    if (!pcs.has(pitchClass(m))) continue;
-    const options = spots.filter((p) => p.midi === m);
-    if (!options.length) break;
-    // Prefer staying close on the neck, and moving up across strings rather than back.
-    const cost = (p) => Math.abs(p.f - cur.f) * 1.0 + (p.s < cur.s ? 6 : 0) + Math.abs(p.s - cur.s) * 0.5
-      + (p.f - cur.f > 3 ? (p.f - cur.f - 3) * 1.5 : 0);
-    const next = options.reduce((a, b) => (cost(b) < cost(a) ? b : a));
-    out.push({ ...next, root: isRoot(m) });
-    cur = next;
-  }
-  return out;
 }

@@ -3,7 +3,8 @@ import { PitchListener } from './audio.js';
 import { Fretboard } from './fretboard.js';
 import { renderStave } from './stave.js';
 import { Tuner } from './tuner.js';
-import { SCALES, ROOTS, scaleById, scalePcs, keyPref, rootName, positions, buildPath } from './scales.js';
+import { Metronome } from './metronome.js';
+import { SCALES, ROOTS, scaleById, scalePcs, scaleSpelling, keyPref, rootName, positions, buildPath } from './scales.js';
 
 const $ = (s) => document.querySelector(s);
 const STORE_KEY = 'fretlab:v1';
@@ -14,9 +15,10 @@ const defaults = {
   tuningId: 'standard',
   custom: ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'].map(parseNote),
   sensitivity: 0.55,
+  bpm: 80,
   learnRoot: 0,
   learnScale: 'major',
-  learnPosition: 'box-0',
+  learnPosition: 'pos-1',
 };
 const FRETS = 22;
 const state = { ...defaults, ...load() };
@@ -59,7 +61,7 @@ function applyAll() {
   listener.tracker.minFreq = midiToFreq(Math.min(...notes)) * 0.94; // nothing below the lowest open string
   tuningSelect.value = state.tuningId;
   $('#sens-input').value = state.sensitivity;
-  fretboard.configure({ tuning: notes, frets: FRETS, pref });
+  fretboard.configure({ tuning: notes, frets: FRETS, pref, label: state.view === 'learn' ? learnLabel : null });
   tuner.setTuning(notes, pref);
   renderCustomEditor();
   rebuildLearn();
@@ -190,12 +192,18 @@ function tapNote(midi, s, f) {
 }
 
 // ---------- Learn mode ----------
-const learn = { path: [], index: 0, started: 0, finished: 0, slips: 0, demo: null };
+const learn = { path: [], index: 0, started: 0, finished: 0, demo: null };
+const spelling = () => scaleSpelling(state.learnRoot, state.learnScale);
+/** Fretboard labels in Learn mode: scale notes spelled for the key, anything else in the key's sharps/flats. */
+function learnLabel(midi) {
+  return spelling().get(((midi % 12) + 12) % 12)?.name ?? noteName(midi, keyPref(state.learnRoot, state.learnScale));
+}
 
 $('#learn-root').innerHTML = ROOTS.map((r) => `<option value="${r.pc}">${r.sharp === r.flat ? r.sharp : `${r.sharp} / ${r.flat}`}</option>`).join('');
 $('#learn-scale').innerHTML = SCALES.map((sc) => `<option value="${sc.id}">${sc.name}</option>`).join('');
-$('#learn-root').addEventListener('change', (e) => { state.learnRoot = Number(e.target.value); applyAll(); });
-$('#learn-scale').addEventListener('change', (e) => { state.learnScale = e.target.value; applyAll(); });
+// A new key or scale starts again from Position 1.
+$('#learn-root').addEventListener('change', (e) => { state.learnRoot = Number(e.target.value); state.learnPosition = 'pos-1'; applyAll(); });
+$('#learn-scale').addEventListener('change', (e) => { state.learnScale = e.target.value; state.learnPosition = 'pos-1'; applyAll(); });
 $('#learn-position').addEventListener('change', (e) => { state.learnPosition = e.target.value; applyAll(); });
 $('#learn-restart').addEventListener('click', () => { restartLearn(); renderLearn(); });
 $('#learn-hear').addEventListener('click', () => playDemo());
@@ -204,8 +212,8 @@ $('#learn-hear').addEventListener('click', () => playDemo());
 function rebuildLearn() {
   const { notes } = currentTuning();
   const frets = FRETS;
-  const pos = positions(notes, state.learnRoot, frets);
-  if (!pos.some((p) => p.id === state.learnPosition)) state.learnPosition = (pos[1] || pos[0]).id;
+  const pos = positions(notes, state.learnRoot, state.learnScale, frets);
+  if (!pos.some((p) => p.id === state.learnPosition)) state.learnPosition = pos[0]?.id ?? 'pos-1';
   $('#learn-position').innerHTML = pos.map((p) => `<option value="${p.id}">${p.label}</option>`).join('');
   $('#learn-root').value = String(state.learnRoot);
   $('#learn-scale').value = state.learnScale;
@@ -221,7 +229,6 @@ function restartLearn() {
   learn.index = 0;
   learn.started = 0;
   learn.finished = 0;
-  learn.slips = 0;
 }
 
 /** A new note was heard (or tapped). Advance if it's the one we're waiting for. */
@@ -234,8 +241,6 @@ function learnHeard(midi) {
     learn.index++;
     if (learn.index === learn.path.length) learn.finished = performance.now();
     renderLearn();
-  } else if (learn.index > 0) {
-    learn.slips++;
   }
 }
 
@@ -256,8 +261,7 @@ function renderLearn() {
     $('#learn-label').textContent = 'Done';
     $('#learn-note').textContent = '✓';
     $('#learn-oct').textContent = '';
-    $('#learn-where').textContent = `${total} notes in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
-      + (learn.slips ? ` · ${learn.slips} wrong note${learn.slips > 1 ? 's' : ''}` : ' · no wrong notes');
+    $('#learn-where').textContent = `${total} notes in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
     $('#learn-count').textContent = 'Tap ↻ to go again';
     renderStave($('#stave'), null, pref, { compact: staveCompact() });
     return;
@@ -269,12 +273,13 @@ function renderLearn() {
     $('#learn-count').textContent = '';
     return;
   }
-  $('#learn-label').textContent = (learn.index === 0 ? (listener.running ? 'Play' : 'Listen, then play') : 'Next') + (t.root ? ' · root' : '');
-  $('#learn-note').textContent = noteName(t.midi, pref);
+  $('#learn-label').textContent = (learn.index === 0 ? 'Start' : 'Next') + (t.root ? ' · root' : '');
+  const sp = spelling().get(((t.midi % 12) + 12) % 12);
+  $('#learn-note').textContent = sp ? sp.name : noteName(t.midi, pref);
   $('#learn-oct').textContent = octaveOf(t.midi);
   $('#learn-where').textContent = `${t.f === 0 ? 'open' : `fret ${t.f}`} · string ${6 - t.s}`;
   $('#learn-count').textContent = `${learn.index + 1} of ${total}`;
-  renderStave($('#stave'), t.midi, pref, { compact: staveCompact() });
+  renderStave($('#stave'), t.midi, pref, { compact: staveCompact(), spelled: sp });
 }
 
 /** Play the scale through once, lighting each note. */
@@ -333,6 +338,44 @@ function showReadout(midi, frame, stale) {
   $('#note-enh').textContent = enh.includes('/') ? enh : '';
   renderStave($('#stave'), midi, pref, { compact: staveCompact() });
 }
+
+// ---------- metronome ----------
+const metro = new Metronome(() => listener.audioContext(), (beat) => {
+  document.querySelectorAll('.metro-beats span').forEach((el, i) => {
+    el.classList.toggle('on', i === beat);
+    el.classList.toggle('accent', i === beat && beat === 0);
+  });
+  $('#metro').classList.toggle('tick', beat >= 0);
+  if (beat >= 0) { $('#metro').classList.remove('flash'); void $('#metro').offsetWidth; $('#metro').classList.add('flash'); }
+});
+function showBpm() {
+  metro.setBpm(state.bpm);
+  $('#metro-value').textContent = metro.bpm;
+}
+function toggleMetro() {
+  metro.toggle();
+  for (const id of ['#metro-play', '#metro-bpm']) {
+    $(id).setAttribute('aria-pressed', String(metro.running));
+    $(id).setAttribute('aria-label', metro.running ? 'Stop metronome' : 'Start metronome');
+  }
+  $('#metro').classList.toggle('running', metro.running);
+}
+$('#metro-play').addEventListener('click', toggleMetro);
+$('#metro-bpm').addEventListener('click', toggleMetro);
+// −/+ step by 1; hold to keep going (speeds up the longer you hold)
+for (const [id, dir] of [['#metro-down', -1], ['#metro-up', 1]]) {
+  const btn = $(id);
+  let timer, held;
+  const step = () => { state.bpm = Math.max(30, Math.min(260, state.bpm + dir * (held > 8 ? 5 : 1))); showBpm(); save(); };
+  const stopHold = () => { clearTimeout(timer); timer = null; };
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); held = 0; step();
+    const again = () => { held++; step(); timer = setTimeout(again, held > 8 ? 90 : 160); };
+    timer = setTimeout(again, 400);
+  });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stopHold);
+}
+showBpm();
 
 // ---------- boot ----------
 setView(state.view);

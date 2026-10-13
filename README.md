@@ -3,8 +3,9 @@
 Guitar practice in the browser.
 
 - **Fretboard** — play a note and see every place it lives on the neck, plus the note on a stave.
-- **Learn** — pick a key, scale and position; the scale lights up orange and you play through it note by note.
+- **Learn** — pick a key, scale and position (pentatonic boxes, three-notes-per-string shapes); the scale lights up orange and you play through it, up and back down.
 - **Tuner** — standard, alternate and custom tunings, with a live pitch trace.
+- **Metronome** — always on screen; accented downbeat, unpitched click so the note detector ignores it.
 
 No build step and no dependencies — plain HTML, CSS and JavaScript modules.
 
@@ -29,7 +30,7 @@ node tests/pitch.test.mjs   # note detector over C2–E6: almost never confident
 node tests/tuner.test.mjs   # tuner: accuracy through a string's decay, smooth peg-turn tracking, string switching
 node tests/lowstrings.test.mjs  # low notes as a laptop/phone mic hears them: weak fundamental, ringing strings, echo
 node tests/fluid.test.mjs   # fast low-string riffs, ringing strings, hammer-ons: how quickly each new note shows
-node tests/scales.test.mjs  # Learn mode: scale spelling, box shapes, neck paths
+node tests/scales.test.mjs  # Learn mode: every scale's notes and spelling, the standard position shapes, all 936 positions playable
 ```
 
 ## How it's organised
@@ -44,7 +45,8 @@ node tests/scales.test.mjs  # Learn mode: scale spelling, box shapes, neck paths
 | `js/fretboard.js` | SVG fretboard: draws any tuning, lights every position of a note, Learn-mode scale overlay |
 | `js/stave.js` | SVG treble-clef-8 stave (guitar notation is written an octave above sounding pitch) |
 | `js/tuner.js` | Tuner gauge, pitch trace, string pills, auto/locked string targeting |
-| `js/scales.js` | Learn mode: scale definitions, key spelling, positions on the neck, the order to play them |
+| `js/scales.js` | Learn mode: scale definitions, letter-correct spelling, standard positions (pentatonic boxes, 3-notes-per-string, blues = box + ♭5) |
+| `js/metronome.js` | Metronome scheduled on the audio clock, accented downbeat |
 | `js/app.js` | Wires it all together; settings persist in localStorage |
 
 Adding a new mode: add a tab + `<section>` in `index.html`, a module in `js/`, and hook it into `setView()` and `onFrame()` in `app.js`.
