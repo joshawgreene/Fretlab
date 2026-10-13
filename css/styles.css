@@ -306,14 +306,22 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .mod-head { margin-bottom: 4px; min-height: 14px; font-size: 10px; }
 
   .controls { gap: 6px; }
-  .tabs button { padding: 6px 2px; font-size: 12px; }
+  .tabs button { padding: 6px 2px; font-size: 13px; }
   select { padding: 6px 26px 6px 8px; font-size: 14px; }
   .listen { min-height: 0; flex-direction: row; gap: 8px; font-size: 15px; }
   .listen svg { width: 20px; height: 20px; }
   .big-note { font-size: clamp(36px, 15vh, 64px); }
-  .enh { margin-top: 4px; font-size: 12px; }
-  .note-card .freq, .tuner-readout .freq { font-size: 16px; margin-top: 4px; }
-  .mini-cents { margin-top: 6px; }
+
+  /* Note + tuner readouts side by side: big note on the left, details stacked on the right */
+  .note-card, .tuner-readout {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto auto 1fr auto;
+    grid-template-areas: "note ." "note a" "note b" "note ." "bar bar"; column-gap: 14px; align-items: center;
+  }
+  .note-card .big-note, .tuner-readout .big-note { grid-area: note; margin: 0; font-size: clamp(44px, 22vh, 84px); align-self: center; }
+  .enh, .tuner-hint { grid-area: a; margin: 0; font-size: 13px; min-height: 0; align-self: end; }
+  .note-card .freq, .tuner-readout .freq { grid-area: b; margin: 3px 0 0; font-size: 17px; flex-wrap: wrap; row-gap: 2px; align-self: start; }
+  .freq .cents { flex-basis: 100%; margin-left: 0; font-size: 12px; }
+  .mini-cents { grid-area: bar; margin-top: 8px; }
   .learn-body { gap: 2px; }
   .learn-where { font-size: 12px; }
   .learn-count { margin-top: 3px; font-size: 11px; }
@@ -321,6 +329,5 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .trace-mod { gap: 6px; }
   .pill { padding: 5px 2px; }
   .pill-note { font-size: 17px; }
-  .tuner-hint { margin-top: 4px; font-size: 14px; }
   .custom-panel { max-height: calc(100dvh - 90px); }
 }

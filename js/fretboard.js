@@ -18,7 +18,7 @@ const el = (tag, attrs = {}, parent) => {
 export class Fretboard {
   /**
    * @param {HTMLElement} host
-   * @param {{onTap?:(midi:number)=>void}} opts
+   * @param {{onTap?:(midi:number, s:number, f:number)=>void}} opts
    */
   constructor(host, opts = {}) {
     this.host = host;
@@ -47,8 +47,10 @@ export class Fretboard {
    * note to play is outlined; notes already played are dimmed.
    */
   setLearn(learn) {
+    const wasLearning = !!this.learn;
     this.learn = learn;
     if (learn) this.trail = [];
+    if (learn && !wasLearning) this.hitAt = null;
     this.paint();
   }
 
@@ -141,22 +143,42 @@ export class Fretboard {
         const g = el('g', { class: f === 0 ? 'pos open' : 'pos', transform: `translate(${cx.toFixed(1)} ${this.stringY(s).toFixed(1)})` }, svg);
         el('rect', { x: -size / 2, y: -size / 2, width: size, height: size }, g);
         el('text', { dy: '0.36em' }, g).textContent = noteName(midi, this.pref);
-        g.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onTap?.(midi); });
+        g.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onTap?.(midi, s, f); });
         this.positions.push({ s, f, midi, g });
       }
     }
     this.paint();
   }
 
-  /** Light up the current note; recent notes fade out as a trail. Returns true if the note changed. */
-  show(midi) {
-    if (midi === this.current) return false;
-    if (this.current !== null) {
+  /**
+   * Light up the note being played. Returns true if the note changed.
+   * Fretboard mode lights every place that pitch lives. Learn mode assumes you're playing the scale
+   * in order, so it lights just one square: the exact one tapped (`at`), or otherwise the place
+   * that pitch sits nearest the note you're meant to be playing.
+   */
+  show(midi, at = null) {
+    if (midi === this.current && !at) return false;
+    if (this.current !== null && midi !== this.current) {
       this.trail = [this.current, ...this.trail.filter((m) => m !== this.current && m !== midi)].slice(0, TRAIL_LENGTH);
     }
     this.current = midi;
+    this.hitAt = at || this.nearestToTarget(midi);
     this.paint();
     return true;
+  }
+
+  /** In Learn mode: where on the neck this pitch most likely is, given the note we're waiting for. */
+  nearestToTarget(midi) {
+    const L = this.learn;
+    const t = L && L.path[Math.min(L.index, L.path.length - 1)];
+    if (!t || midi === null) return null;
+    let best = null, bestCost = Infinity;
+    for (const p of this.positions || []) {
+      if (p.midi !== midi) continue;
+      const cost = Math.abs(p.f - t.f) + 1.5 * Math.abs(p.s - t.s);
+      if (cost < bestCost) { bestCost = cost; best = { s: p.s, f: p.f }; }
+    }
+    return best;
   }
 
   setInTune(inTune) {
@@ -178,13 +200,17 @@ export class Fretboard {
     const pathIdx = new Map();
     L?.path.forEach((n, i) => { if (!pathIdx.has(key(n.s, n.f))) pathIdx.set(key(n.s, n.f), i); });
     const target = L && L.index < L.path.length ? L.path[L.index] : null;
-    const doneSet = new Set(L ? L.path.slice(0, L.index).map((n) => key(n.s, n.f)) : []);
-    // Positions still to come (an up-and-down run revisits notes on the way back down).
-    const todo = new Set(L ? L.path.slice(L.index).map((n) => key(n.s, n.f)) : []);
+    // An up-and-down run revisits the same squares, so each half counts separately: squares played on the
+    // way up dim, then light up again for the way down.
+    let top = 0;
+    L?.path.forEach((n, i) => { if (n.midi > L.path[top].midi) top = i; });
+    const segStart = L && L.index > top ? top : 0;
+    const doneSet = new Set(L ? L.path.slice(segStart, L.index).map((n) => key(n.s, n.f)) : []);
     this.svg?.classList.toggle('learning', !!L);
     for (const p of this.positions) {
       const age = this.trail.indexOf(p.midi);
-      p.g.classList.toggle('hit', p.midi === this.current);
+      const isHit = p.midi === this.current && (!L || (!!this.hitAt && this.hitAt.s === p.s && this.hitAt.f === p.f));
+      p.g.classList.toggle('hit', isHit);
       p.g.classList.toggle('trail', !L && p.midi !== this.current && age !== -1);
       if (age !== -1) p.g.style.setProperty('--age', age);
       const k = key(p.s, p.f);
@@ -192,7 +218,7 @@ export class Fretboard {
       p.g.classList.toggle('scale', inScale);
       p.g.classList.toggle('root', inScale && ((p.midi - L.rootPc) % 12 + 12) % 12 === 0);
       p.g.classList.toggle('in-path', !!L && pathIdx.has(k));
-      p.g.classList.toggle('done', !!L && doneSet.has(k) && !todo.has(k));
+      p.g.classList.toggle('done', !!L && doneSet.has(k) && !(target && target.s === p.s && target.f === p.f));
       p.g.classList.toggle('target', !!target && target.s === p.s && target.f === p.f);
     }
   }

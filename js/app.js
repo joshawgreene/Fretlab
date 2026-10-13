@@ -177,12 +177,12 @@ function onFrame(frame) {
 }
 
 /** Tap a fretboard position: hear it, and (when not listening) show it / play it in Learn mode. */
-function tapNote(midi) {
+function tapNote(midi, s, f) {
   listener.pluck(midi);
   if (!listener.running) {
     lastMidi = midi;
     lastFrame = null;
-    fretboard.show(midi);
+    fretboard.show(midi, { s, f });
     showReadout(midi, null, false);
     learnHeard(midi);
   }
