@@ -110,6 +110,7 @@ $('#sens-input').addEventListener('input', (e) => { state.sensitivity = Number(e
 // Tabs. Fretboard and Learn share the fretboard + stave; Learn swaps the note panel for its own.
 function setView(view) {
   const changed = state.view !== view;
+  if (changed) closePanels();
   state.view = view;
   document.body.dataset.view = view;
   listener.setTunerMode(view === 'tuner');
@@ -148,6 +149,11 @@ micBtn.addEventListener('click', async () => {
   document.body.classList.toggle('listening', listener.running);
   if (listener.running) keepAwake(); else releaseWake();
 });
+
+// Drop-down panels (scale picker, piece menu, custom tuning): close on a tap elsewhere or Escape.
+const closePanels = (except = null) => document.querySelectorAll('details[open]').forEach((d) => { if (d !== except) d.open = false; });
+document.addEventListener('pointerdown', (e) => closePanels(e.target.closest('details')));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanels(); });
 
 // ---------- phones: keep the screen on while listening, recover after backgrounding ----------
 let wakeLock = null;

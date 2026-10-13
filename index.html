@@ -174,10 +174,14 @@
     <!-- Controls (shared by every view) -->
     <section class="mod mod-c controls" aria-label="Controls">
       <div class="tabs" role="tablist" aria-label="Mode">
-        <button role="tab" id="tab-fretboard" aria-controls="view-fretboard" aria-selected="true" type="button">Frets</button>
-        <button role="tab" id="tab-learn" aria-controls="view-fretboard" aria-selected="false" type="button">Learn</button>
-        <button role="tab" id="tab-play" aria-controls="view-fretboard" aria-selected="false" type="button">Play</button>
-        <button role="tab" id="tab-tuner" aria-controls="view-tuner" aria-selected="false" type="button">Tune</button>
+        <button role="tab" id="tab-fretboard" aria-controls="view-fretboard" aria-selected="true" type="button" title="Frets — see the notes you play">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h20M2 10h20M2 14h20M2 18h20M7 4v16M13 4v16M19 4v16"/><rect class="fill" x="8.5" y="12" width="3" height="4"/></svg><span class="sr">Frets</span></button>
+        <button role="tab" id="tab-learn" aria-controls="view-fretboard" aria-selected="false" type="button" title="Learn — scales">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h5v-5h5v-5h5V5h3"/><rect class="fill" x="17" y="2" width="4" height="3"/></svg><span class="sr">Learn</span></button>
+        <button role="tab" id="tab-play" aria-controls="view-fretboard" aria-selected="false" type="button" title="Play — a piece of music">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18V4l8 3"/><ellipse class="fill" cx="7.5" cy="18" rx="3.5" ry="2.8"/></svg><span class="sr">Play</span></button>
+        <button role="tab" id="tab-tuner" aria-controls="view-tuner" aria-selected="false" type="button" title="Tune">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v9a4 4 0 0 0 8 0V2M12 15v7"/></svg><span class="sr">Tune</span></button>
       </div>
       <div class="ctrl-row">
         <label class="field grow"><span class="sr">Tuning</span><select id="tuning-select"></select></label>
