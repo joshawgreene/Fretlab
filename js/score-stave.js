@@ -100,7 +100,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
   const W = Math.max(natural, minWidth) + 2;
 
   // ---- drawing ----
-  let svg = '';
+  let svg = '', bands = ''; // bands: the highlight behind the note to play, drawn under everything
   const lineEnd = bars.length ? bars[bars.length - 1].x1 : W - 6;
   for (const s of LINES) svg += `<line class="st-line" x1="6" x2="${lineEnd}" y1="${y(s)}" y2="${y(s)}"/>`;
   svg += `<line class="st-line" x1="6" x2="6" y1="${y(38)}" y2="${y(30)}"/>`;
@@ -183,6 +183,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
         for (let j = idx - 1; j >= 0; j--) { const p = bar.items[j]; if (!p.n.tieStop && !p.n.rest) { stateKey = order(bar.b, p.i); break; } }
       }
       const cls = stateKey === curKey ? 'cur' : stateKey === nextKey ? 'next' : stateKey < curKey ? 'done' : '';
+      if (cls === 'cur' && !n.tieStop) bands += `<rect class="sc-cur-band" x="${it.x - 13}" y="${y(40)}" width="26" height="${y(28) - y(40)}"/>`;
       svg += `<g class="sc-note ${cls}">${n.rest ? rest(n, it.x, y) : note(n, it, y, beamed.get(it))}</g>`;
       if (n.tieStart && !n.rest) {
         const nxt = bar.items[idx + 1] || null;
@@ -197,7 +198,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
     });
   }
 
-  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="stave-svg score-svg" role="img" aria-label="Bars ${first.number}${count > 1 ? '–' + score.measures[start + count - 1].number : ''}">${svg}</svg>`;
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="stave-svg score-svg" role="img" aria-label="Bars ${first.number}${count > 1 ? '–' + score.measures[start + count - 1].number : ''}">${bands}${svg}</svg>`;
 }
 
 function keyAlters(fifths) {
