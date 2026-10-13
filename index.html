@@ -24,17 +24,14 @@
     <!-- Fretboard + Learn: [stave | note or learn | controls] over the fretboard -->
     <div id="view-fretboard" class="view-group">
       <section class="mod mod-a stave-mod" aria-label="Stave">
-        <header class="mod-head"><span>Stave</span><span class="muted">written 8va</span></header>
         <div id="stave"></div>
       </section>
 
       <section class="mod mod-b note-card" id="note-card" aria-label="Note">
-        <header class="mod-head"><span>Note</span><span id="note-cents"></span></header>
         <div class="big-note"><span id="note-name">—</span><sub id="note-oct"></sub></div>
         <p class="enh" id="note-enh">Play a single note</p>
-        <div class="freq"><span id="note-hz">—</span><span class="unit">Hz</span></div>
+        <div class="freq"><span id="note-hz">—</span><span class="unit">Hz</span><span class="cents" id="note-cents"></span></div>
         <div class="mini-cents" aria-hidden="true"><span class="mid"></span><span id="mini-needle"></span></div>
-        <p class="positions" id="note-positions"></p>
       </section>
 
       <section class="mod mod-b learn-card" id="learn-card" aria-label="Learn">
@@ -46,9 +43,6 @@
               <label class="field"><span>Key</span><select id="learn-root"></select></label>
               <label class="field"><span>Scale</span><select id="learn-scale"></select></label>
               <label class="field"><span>Where on the neck</span><select id="learn-position"></select></label>
-              <div class="seg" role="group" aria-label="Direction">
-                <button type="button" data-dir="up">Up</button><button type="button" data-dir="updown">Up &amp; down</button>
-              </div>
             </div>
           </details>
           <button class="btn icon" id="learn-hear" type="button" aria-label="Hear the scale" title="Hear it">
@@ -68,8 +62,6 @@
       </section>
 
       <section class="mod mod-board fb-card" aria-label="Fretboard">
-        <header class="mod-head"><span id="fb-label">Fretboard <span class="muted">· tap any fret to hear it</span></span>
-          <button class="link" id="clear-trail" type="button">Clear</button></header>
         <div id="fretboard"></div>
       </section>
 
@@ -84,23 +76,19 @@
     <!-- Tuner: [gauge | readout | controls] over the pitch trace and strings -->
     <div id="view-tuner" class="view-group tuner idle" hidden>
       <section class="mod mod-a gauge-mod" aria-label="Tuner gauge">
-        <header class="mod-head"><span>Tuner</span><span class="muted">±3¢ = in tune</span></header>
         <div id="gauge" class="gauge"></div>
       </section>
       <section class="mod mod-b tuner-readout" aria-label="Tuning">
-        <header class="mod-head"><span>String</span><span id="tuner-cents"></span></header>
         <div class="big-note"><span id="tuner-note">—</span><sub id="tuner-octave"></sub></div>
         <p id="tuner-hint" class="tuner-hint">Play any open string</p>
-        <div class="freq"><span id="tuner-hz">—</span><span class="unit">Hz</span></div>
+        <div class="freq"><span id="tuner-hz">—</span><span class="unit">Hz</span><span class="cents" id="tuner-cents"></span></div>
       </section>
       <section class="mod mod-board trace-mod" aria-label="Pitch trace and strings">
-        <header class="mod-head"><span>Pitch <span class="muted">· last 5 seconds · let one string ring at a time</span></span></header>
         <div class="trace" aria-hidden="true">
           <span class="trace-label sharp-label">♯ sharp</span><span class="trace-label flat-label">♭ flat</span>
           <canvas id="tuner-trace"></canvas>
         </div>
         <div class="pill-row">
-          <button id="tuner-auto" class="btn small" type="button" aria-pressed="true">Auto</button>
           <div id="string-pills" class="pills"></div>
         </div>
       </section>
@@ -108,10 +96,6 @@
 
     <!-- Controls (shared by every view) -->
     <section class="mod mod-c controls" aria-label="Controls">
-      <header class="mod-head brand-row">
-        <span class="brand">Fretlab</span>
-        <div class="level" aria-hidden="true"><span id="level-bar"></span></div>
-      </header>
       <div class="tabs" role="tablist" aria-label="Mode">
         <button role="tab" id="tab-fretboard" aria-controls="view-fretboard" aria-selected="true" type="button">Fretboard</button>
         <button role="tab" id="tab-learn" aria-controls="view-fretboard" aria-selected="false" type="button">Learn</button>
@@ -127,33 +111,11 @@
           </div>
         </details>
       </div>
-      <div class="open-strings" id="open-strings" aria-label="Open strings, low to high"></div>
-      <div class="ctrl-row">
-        <details class="settings">
-          <summary class="btn icon" aria-label="Settings" title="Settings">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><rect x="14" y="5" width="4" height="4"/><rect x="6" y="15" width="4" height="4"/></svg>
-          </summary>
-          <div class="settings-panel">
-            <label class="toggle"><input type="checkbox" id="names-toggle" /><span>Show all note names on the fretboard</span></label>
-            <label class="field"><span>Note names</span>
-              <select id="pref-select"><option value="sharp">Sharps (C♯)</option><option value="flat">Flats (D♭)</option><option value="auto">Match tuning / key</option></select>
-            </label>
-            <label class="field frets-field"><span>Frets shown</span>
-              <select id="frets-select"><option>12</option><option selected>15</option><option>22</option><option>24</option></select>
-            </label>
-            <label class="field"><span>Reference A4 <output id="a4-out">440</output> Hz</span>
-              <input id="a4-input" type="range" min="430" max="450" step="1" value="440" />
-            </label>
-            <label class="field"><span>Mic sensitivity</span>
-              <input id="sens-input" type="range" min="0" max="1" step="0.05" value="0.55" />
-            </label>
-          </div>
-        </details>
-        <button id="mic-btn" class="btn primary grow" type="button" aria-pressed="false" aria-label="Start listening">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-          <span id="mic-label">Listen</span>
-        </button>
-      </div>
+      <label class="sens"><span>Mic</span><input id="sens-input" type="range" min="0" max="1" step="0.05" value="0.55" aria-label="Mic sensitivity" /></label>
+      <button id="mic-btn" class="btn primary listen" type="button" aria-pressed="false" aria-label="Start listening">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <span id="mic-label">Listen</span>
+      </button>
     </section>
   </div>
 

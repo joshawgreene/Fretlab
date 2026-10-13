@@ -1,4 +1,4 @@
-import { TUNINGS, parseNote, setA4, noteName, octaveOf, enharmonic, customNoteRange } from './notes.js';
+import { TUNINGS, parseNote, noteName, octaveOf, enharmonic, customNoteRange } from './notes.js';
 import { PitchListener } from './audio.js';
 import { Fretboard } from './fretboard.js';
 import { renderStave } from './stave.js';
@@ -13,16 +13,12 @@ const defaults = {
   view: 'fretboard',
   tuningId: 'standard',
   custom: ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'].map(parseNote),
-  pref: 'auto',
-  frets: 15,
-  showNames: false,
-  a4: 440,
   sensitivity: 0.55,
   learnRoot: 0,
   learnScale: 'major',
   learnPosition: 'box-0',
-  learnDir: 'up',
 };
+const FRETS = 22;
 const state = { ...defaults, ...load() };
 function load() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
@@ -36,20 +32,15 @@ const currentTuning = () => {
   const t = TUNINGS.find((x) => x.id === state.tuningId) || TUNINGS[0];
   return { notes: t.notes.map(parseNote), pref: t.pref || 'sharp' };
 };
-const notePref = () => (state.view === 'learn' && state.pref === 'auto'
-  ? keyPref(state.learnRoot, state.learnScale)
-  : state.pref === 'auto' ? currentTuning().pref : state.pref);
+// Sharps or flats: follow the scale's key in Learn mode, otherwise the tuning.
+const notePref = () => (state.view === 'learn' ? keyPref(state.learnRoot, state.learnScale) : currentTuning().pref);
 
-// Phones in landscape always get the full neck; the "Frets shown" setting is for bigger screens.
-const phoneLandscape = window.matchMedia('(orientation: landscape) and (max-height: 500px)');
-const fretsShown = () => (phoneLandscape.matches ? 22 : state.frets);
 const staveCompact = () => window.innerHeight < 760;
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => { lastReadoutKey = ''; showReadout(lastMidi, lastFrame, !lastFrame?.active); renderLearn(); }, 120);
 });
-phoneLandscape.addEventListener('change', () => applyAll());
 
 // ---------- components ----------
 const listener = new PitchListener(onFrame);
@@ -64,18 +55,11 @@ tuningSelect.innerHTML = TUNINGS.map((t) => `<option value="${t.id}">${t.name}</
 function applyAll() {
   const { notes } = currentTuning();
   const pref = notePref();
-  setA4(state.a4);
   listener.setSensitivity(state.sensitivity);
   tuningSelect.value = state.tuningId;
-  $('#pref-select').value = state.pref;
-  $('#frets-select').value = String(state.frets);
-  $('#a4-input').value = state.a4;
-  $('#a4-out').textContent = state.a4;
   $('#sens-input').value = state.sensitivity;
-  $('#names-toggle').checked = state.showNames;
-  fretboard.configure({ tuning: notes, frets: fretsShown(), pref, showNames: state.showNames });
+  fretboard.configure({ tuning: notes, frets: FRETS, pref });
   tuner.setTuning(notes, pref);
-  $('#open-strings').innerHTML = notes.map((m, i) => `<span><small>${6 - i}</small>${noteName(m, pref)}</span>`).join('');
   renderCustomEditor();
   rebuildLearn();
   lastReadoutKey = '';
@@ -106,12 +90,7 @@ tuningSelect.addEventListener('change', () => {
   applyAll();
   if (state.tuningId === 'custom') $('#custom-editor').open = true;
 });
-$('#pref-select').addEventListener('change', (e) => { state.pref = e.target.value; applyAll(); });
-$('#frets-select').addEventListener('change', (e) => { state.frets = Number(e.target.value); applyAll(); });
-$('#a4-input').addEventListener('input', (e) => { state.a4 = Number(e.target.value); applyAll(); });
 $('#sens-input').addEventListener('input', (e) => { state.sensitivity = Number(e.target.value); listener.setSensitivity(state.sensitivity); save(); });
-$('#names-toggle').addEventListener('change', (e) => { state.showNames = e.target.checked; applyAll(); });
-$('#clear-trail').addEventListener('click', () => fretboard.clearTrail());
 
 // Tabs. Fretboard and Learn share the fretboard + stave; Learn swaps the note panel for its own.
 function setView(view) {
@@ -181,12 +160,10 @@ function hideBanner() { $('#banner').hidden = true; }
 // ---------- live updates ----------
 let lastMidi = null;
 let lastFrame = null;
-const levelBar = $('#level-bar');
 
 let heardMidi = null; // the note currently sounding, for spotting each new note in Learn mode
 
 function onFrame(frame) {
-  levelBar.style.transform = `scaleX(${Math.min(1, Math.sqrt(frame.level) * 4)})`;
   if (state.view === 'tuner') tuner.update(frame.tune, listener.running);
   if (frame.active) {
     lastMidi = frame.midi;
@@ -219,22 +196,20 @@ $('#learn-scale').innerHTML = SCALES.map((sc) => `<option value="${sc.id}">${sc.
 $('#learn-root').addEventListener('change', (e) => { state.learnRoot = Number(e.target.value); applyAll(); });
 $('#learn-scale').addEventListener('change', (e) => { state.learnScale = e.target.value; applyAll(); });
 $('#learn-position').addEventListener('change', (e) => { state.learnPosition = e.target.value; applyAll(); });
-document.querySelectorAll('.seg [data-dir]').forEach((b) => b.addEventListener('click', () => { state.learnDir = b.dataset.dir; applyAll(); }));
 $('#learn-restart').addEventListener('click', () => { restartLearn(); renderLearn(); });
 $('#learn-hear').addEventListener('click', () => playDemo());
 
 /** Recompute the scale path from the current settings, keeping progress if nothing changed. */
 function rebuildLearn() {
   const { notes } = currentTuning();
-  const frets = fretsShown();
+  const frets = FRETS;
   const pos = positions(notes, state.learnRoot, frets);
   if (!pos.some((p) => p.id === state.learnPosition)) state.learnPosition = (pos[1] || pos[0]).id;
   $('#learn-position').innerHTML = pos.map((p) => `<option value="${p.id}">${p.label}</option>`).join('');
   $('#learn-root').value = String(state.learnRoot);
   $('#learn-scale').value = state.learnScale;
   $('#learn-position').value = state.learnPosition;
-  document.querySelectorAll('.seg [data-dir]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dir === state.learnDir)));
-  const path = buildPath(notes, { rootPc: state.learnRoot, scaleId: state.learnScale, positionId: state.learnPosition, frets, direction: state.learnDir });
+  const path = buildPath(notes, { rootPc: state.learnRoot, scaleId: state.learnScale, positionId: state.learnPosition, frets, direction: 'updown' });
   const sig = path.map((n) => `${n.s}:${n.f}`).join();
   if (sig !== learn.sig) { learn.sig = sig; learn.path = path; restartLearn(); }
   renderLearn();
@@ -338,30 +313,23 @@ function showReadout(midi, frame, stale) {
   fretboard.setInTune(inTune && !stale);
   $('#mini-needle').style.transform = `translateX(${Math.max(-50, Math.min(50, cents))}%)`;
   $('#note-hz').textContent = frame ? frame.freq.toFixed(1) : '—';
-  $('#note-cents').textContent = frame ? `${cents > 0 ? '+' : ''}${cents.toFixed(0)}¢` : '';
+  $('#note-cents').textContent = frame ? `${cents > 0 ? '+' : cents < 0 ? '−' : '±'}${Math.abs(cents).toFixed(0)}¢` : '';
 
   // Everything below only changes when the note changes — skip DOM work otherwise.
-  const key = `${midi}|${pref}|${state.tuningId}|${state.custom}|${fretsShown()}|${staveCompact()}`;
+  const key = `${midi}|${pref}|${state.tuningId}|${state.custom}|${FRETS}|${staveCompact()}`;
   if (key === lastReadoutKey) return;
   lastReadoutKey = key;
   if (midi === null) {
     $('#note-name').textContent = '—';
     $('#note-oct').textContent = '';
     $('#note-enh').textContent = listener.running ? 'Play a single note' : 'Start listening, or tap the fretboard';
-    $('#note-positions').textContent = '';
     renderStave($('#stave'), null, pref, { compact: staveCompact() });
     return;
   }
   $('#note-name').textContent = noteName(midi, pref);
   $('#note-oct').textContent = octaveOf(midi);
   const enh = enharmonic(midi);
-  $('#note-enh').textContent = enh.includes('/') ? enh : 'Natural';
-  const { notes } = currentTuning();
-  const where = notes
-    .map((open, i) => ({ string: 6 - i, fret: midi - open }))
-    .filter((p) => p.fret >= 0 && p.fret <= fretsShown())
-    .map((p) => (p.fret === 0 ? `string ${p.string} open` : `string ${p.string} fret ${p.fret}`));
-  $('#note-positions').textContent = where.length ? where.join(' · ') : 'Not on the frets shown';
+  $('#note-enh').textContent = enh.includes('/') ? enh : '';
   renderStave($('#stave'), midi, pref, { compact: staveCompact() });
 }
 

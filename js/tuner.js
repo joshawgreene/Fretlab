@@ -17,7 +17,6 @@ export class Tuner {
     this.hintEl = root.querySelector('#tuner-hint');
     this.hzEl = root.querySelector('#tuner-hz');
     this.centsEl = root.querySelector('#tuner-cents');
-    this.autoBtn = root.querySelector('#tuner-auto');
     this.trace = new Trace(root.querySelector('#tuner-trace'));
     this.tuning = [];
     this.pref = 'sharp';
@@ -26,7 +25,6 @@ export class Tuner {
     this.inTuneSince = 0;
     this.target = null;
     this.drawGauge();
-    this.autoBtn.addEventListener('click', () => this.setLocked(null));
   }
 
   setTuning(tuning, pref) {
@@ -40,7 +38,6 @@ export class Tuner {
   setLocked(i) {
     this.locked = i;
     this.target = null;
-    this.autoBtn.setAttribute('aria-pressed', String(i === null));
     this.renderPills();
   }
 
@@ -51,8 +48,13 @@ export class Tuner {
       b.className = 'pill';
       b.type = 'button';
       b.innerHTML = `<span class="pill-num">${6 - i}</span><span class="pill-note">${noteName(midi, this.pref)}<sub>${octaveOf(midi)}</sub></span>`;
-      b.title = `String ${6 - i}: ${noteLabel(midi, this.pref)} — tap to lock and hear it`;
-      b.addEventListener('click', () => { this.setLocked(i); this.onPluck(midi); });
+      b.title = `String ${6 - i}: ${noteLabel(midi, this.pref)} — tap to lock on and hear it, tap again to go back to auto`;
+      // Tap to lock onto this string (and hear it); tap the locked string again to go back to auto-detect.
+      b.addEventListener('click', () => {
+        if (this.locked === i) { this.setLocked(null); return; }
+        this.setLocked(i);
+        this.onPluck(midi);
+      });
       this.pillsHost.appendChild(b);
       return b;
     });

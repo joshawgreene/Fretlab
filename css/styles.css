@@ -89,7 +89,6 @@ body[data-view="fretboard"] .learn-card, body[data-view="learn"] .note-card { di
 .btn.icon { padding: 7px; }
 .btn[aria-pressed="true"]:not(.primary) { background: var(--ink); color: var(--bg); }
 #learn-hear svg { fill: currentColor; stroke: none; }
-.link { border: 0; background: none; padding: 0; cursor: pointer; font: 700 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 .grow { flex: 1; min-width: 0; }
 
 .field { display: grid; gap: 4px; font: 700 11px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -101,46 +100,35 @@ select {
   text-transform: none; letter-spacing: 0;
 }
 input[type="range"] { accent-color: var(--ink); width: 100%; }
-.toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
-.toggle input { accent-color: var(--ink); width: 16px; height: 16px; }
 
 .controls { gap: 8px; }
-.brand-row { margin-bottom: 2px; }
-.brand { font: 900 20px/1 var(--display); font-stretch: 125%; letter-spacing: -.02em; text-transform: uppercase; }
-.level { width: 56px; height: 8px; background: var(--surface-2); overflow: hidden; }
-.level span { display: block; height: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 60ms linear; }
 .tabs { display: grid; grid-template-columns: repeat(3, 1fr); border: 2px solid var(--ink); }
 .tabs button { border: 0; background: transparent; padding: 7px 4px; cursor: pointer; font-weight: 700; font-size: 13px; font-stretch: 105%; color: var(--ink); }
 .tabs button + button { border-left: 2px solid var(--ink); }
 .tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
 .ctrl-row { display: flex; gap: 8px; align-items: stretch; }
-.open-strings { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border: 2px solid var(--ink); }
-.open-strings span { display: grid; justify-items: center; gap: 2px; padding: 6px 0 5px; font: 900 18px/1 var(--display); font-stretch: 115%; }
-.open-strings span + span { border-left: 2px solid var(--ink); }
-.open-strings small { font: 700 9px/1 var(--mono); color: var(--muted); }
-body[data-view="tuner"] .open-strings { display: none; }
-.controls .ctrl-row:last-child { margin-top: auto; }
-.controls #mic-btn { padding: 10px 12px; }
+/* Mic sensitivity */
+.sens { display: flex; align-items: center; gap: 10px; font: 700 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sens input { flex: 1; margin: 0; }
+/* The big Listen button fills whatever room the controls module has left */
+.listen { flex: 1; min-height: 52px; flex-direction: column; gap: 6px; font-size: clamp(16px, 2.6vh, 24px); font-stretch: 125%; font-weight: 900; text-transform: uppercase; letter-spacing: .02em; }
+.listen svg { width: clamp(22px, 4vh, 36px); height: clamp(22px, 4vh, 36px); }
 
-/* Pop-overs: settings, custom tuning, scale picker */
+/* Pop-overs: custom tuning, scale picker */
 details > summary { list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
-.settings, .picker, .custom { position: relative; }
-.settings[open] > summary, .picker[open] > summary, .custom[open] > summary { background: var(--ink); color: var(--bg); }
-.settings-panel, .picker-panel, .custom-panel {
+.picker, .custom { position: relative; }
+.picker[open] > summary, .custom[open] > summary { background: var(--ink); color: var(--bg); }
+.picker-panel, .custom-panel {
   position: absolute; top: calc(100% + 6px); z-index: 20; width: min(290px, calc(100vw - 32px));
   max-height: calc(100dvh - 110px); overflow-y: auto;
   display: grid; gap: 14px; padding: 16px; background: var(--surface); border: 2px solid var(--ink);
   box-shadow: 6px 6px 0 var(--ink);
 }
-.controls .settings, .controls .custom { position: static; }   /* anchor their panels to the controls module */
-.settings-panel, .custom-panel { right: 10px; top: calc(100% + 4px); }
+.controls .custom { position: static; }   /* anchor its panel to the controls module */
+.custom-panel { right: 10px; top: calc(100% + 4px); }
 .custom-panel { width: min(340px, calc(100vw - 32px)); }
 .picker-panel { left: 0; }
-.seg { display: grid; grid-template-columns: 1fr 1fr; border: 2px solid var(--ink); }
-.seg button { border: 0; background: transparent; padding: 7px; cursor: pointer; font-size: 13px; font-weight: 700; }
-.seg button + button { border-left: 2px solid var(--ink); }
-.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .custom-title { margin: 0; font-weight: 800; }
 .custom-title span { color: var(--muted); font-weight: 500; }
 .custom-strings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -155,20 +143,20 @@ details > summary::-webkit-details-marker { display: none; }
 .big-note sub { font: 700 .3em/1 var(--mono); color: var(--muted); letter-spacing: 0; vertical-align: baseline; }
 .freq { display: flex; align-items: baseline; gap: 6px; font: 700 clamp(18px, 3.4vh, 30px)/1 var(--mono); font-variant-numeric: tabular-nums; }
 .freq .unit { font-size: .5em; color: var(--muted); }
+.freq .cents { margin-left: auto; font-size: .6em; color: var(--muted); }
 
 /* Note module */
 .note-card { transition: opacity .3s; }
 .note-card .big-note { margin-top: auto; transition: color .12s; }
+.stave-mod, .note-card, .gauge-mod, .tuner-readout { padding-top: 14px; }
 .note-card.in-tune .big-note { color: var(--accent); }
 .note-card.stale { opacity: .45; }
-#note-cents { font-variant-numeric: tabular-nums; }
-.enh { margin: 8px 0 auto; color: var(--muted); font-weight: 700; font-stretch: 110%; }
+.enh { margin: 8px 0 auto; min-height: 1.4em; color: var(--muted); font-weight: 700; font-stretch: 110%; }
 .note-card .freq { margin-top: 10px; }
 .mini-cents { position: relative; height: 8px; margin-top: 10px; background: var(--surface-2); flex: none; }
 .mini-cents .mid { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); }
 #mini-needle { position: absolute; left: 50%; top: -4px; width: 4px; height: 16px; margin-left: -2px; background: var(--ink); transition: transform .08s linear; }
 .in-tune #mini-needle { background: var(--accent); }
-.positions { margin: 10px 0 0; font: 600 12px/1.4 var(--mono); color: var(--muted); }
 
 /* Learn module */
 .learn-head { justify-content: flex-start; gap: 6px; text-transform: none; letter-spacing: 0; font: inherit; margin-bottom: 0; }
@@ -198,7 +186,6 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
 
 /* ---------- fretboard ---------- */
 .fb-card { padding-bottom: 6px; }
-body[data-view="learn"] #clear-trail { visibility: hidden; }
 #fretboard { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 .fretboard-svg { position: absolute; inset: 0; width: 100%; height: 100%; user-select: none; -webkit-user-select: none; }
 .fb-wood { fill: var(--board); }
@@ -212,8 +199,6 @@ body[data-view="learn"] #clear-trail { visibility: hidden; }
 .pos rect { fill: var(--surface-2); stroke: none; opacity: 0; transform-box: fill-box; transform-origin: center; transition: opacity .12s, fill .12s, transform .12s; }
 .pos text { fill: var(--ink); font: 800 var(--fb-font, 11px) var(--display); font-stretch: 110%; text-anchor: middle; opacity: 0; pointer-events: none; transition: opacity .12s; }
 @media (hover: hover) { .pos:hover rect { opacity: 1; } .pos:hover text { opacity: 1; } }
-.show-names .pos rect { opacity: 1; fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
-.show-names .pos text { opacity: 1; }
 
 /* Learn: scale notes */
 .pos.scale rect { opacity: 1; fill: var(--scale-dim); stroke: none; }
@@ -264,7 +249,6 @@ body[data-view="learn"] #clear-trail { visibility: hidden; }
 .tuner-hint { margin: 10px 0 auto; font-weight: 800; font-stretch: 115%; font-size: clamp(16px, 2.6vh, 22px); text-transform: uppercase; }
 .tuner.in-tune .tuner-hint { color: var(--accent); }
 .tuner-readout .freq { margin-top: 8px; }
-#tuner-cents { font-variant-numeric: tabular-nums; }
 .trace-mod { gap: 10px; }
 .trace { position: relative; flex: 1; min-height: 60px; background: var(--surface); border: 2px solid var(--ink); }
 #tuner-trace { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -311,7 +295,7 @@ body[data-view="learn"] #clear-trail { visibility: hidden; }
   .tuner-readout .tuner-hint { margin-bottom: 8px; }
   .trace-mod { height: 300px; }
   .pills { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .controls .ctrl-row:last-child { margin-top: 0; }
+  .listen { flex: none; min-height: 56px; flex-direction: row; }
 }
 
 /* ---------- landscape phones ---------- */
@@ -320,11 +304,12 @@ body[data-view="learn"] #clear-trail { visibility: hidden; }
   .app { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 196px; grid-template-rows: minmax(0, 1fr) minmax(0, 1.05fr); }
   .mod { padding: 8px 10px 8px; }
   .mod-head { margin-bottom: 4px; min-height: 14px; font-size: 10px; }
-  .frets-field, .positions, .brand-row, .stave-mod .mod-head, .fb-card .mod-head, .open-strings { display: none; }
+
   .controls { gap: 6px; }
   .tabs button { padding: 6px 2px; font-size: 12px; }
   select { padding: 6px 26px 6px 8px; font-size: 14px; }
-  .controls #mic-btn { padding: 8px 10px; }
+  .listen { min-height: 0; flex-direction: row; gap: 8px; font-size: 15px; }
+  .listen svg { width: 20px; height: 20px; }
   .big-note { font-size: clamp(36px, 15vh, 64px); }
   .enh { margin-top: 4px; font-size: 12px; }
   .note-card .freq, .tuner-readout .freq { font-size: 16px; margin-top: 4px; }
@@ -337,6 +322,5 @@ body[data-view="learn"] #clear-trail { visibility: hidden; }
   .pill { padding: 5px 2px; }
   .pill-note { font-size: 17px; }
   .tuner-hint { margin-top: 4px; font-size: 14px; }
-  .settings-panel { max-height: calc(100dvh - 120px); }
   .custom-panel { max-height: calc(100dvh - 90px); }
 }
