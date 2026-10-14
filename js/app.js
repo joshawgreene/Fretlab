@@ -599,7 +599,7 @@ function renderPlay() {
       : tiny ? `${score.measures[view.start].number}/${score.measures[N - 1].number}` : `Bar ${score.measures[view.start].number} / ${score.measures[N - 1].number}`;
     const away = t.m < view.start || t.m > last;
     $('#bar-now').hidden = !away;
-    $('#bar-now').textContent = state.playWide && innerWidth > 720 ? `Back to bar ${score.measures[t.m].number}` : `↩ ${score.measures[t.m].number}`;
+    $('#bar-now').textContent = `↩ ${score.measures[t.m].number}`;
     $('#bar-now').title = `Back to bar ${score.measures[t.m].number}, where you're up to`;
     // sections: tap one to look at it
     const strip = $('#section-strip');
@@ -960,9 +960,9 @@ function renderChord() {
     tools.innerHTML = (done ? group('safe', 'Next') + group('tension', 'Tension') + group('surprise', 'Surprise')
         : has ? `<button class="btn primary small done-btn" type="button" data-done title="Finished drawing: show where to go next">${icon('M4 12l5 5L20 6')}<span>Done</span></button>` : '')
       + `<span class="tools-gap"></span>`
-      + (state.chordProg.length ? `<button class="btn icon" type="button" data-loop aria-pressed="${!!chord.loop}" aria-label="${chord.loop ? 'Stop' : 'Loop the progression'}" title="${chord.loop ? 'Stop' : 'Loop the progression (metronome tempo)'}">${icon(chord.loop ? 'M6 6h12v12H6z' : 'M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4')}</button>` : '')
-      + (state.chordProg.length ? `<button class="btn icon" type="button" data-undo aria-label="Back one chord" title="Back one chord">${icon('M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3')}</button>` : '')
-      + (has || state.chordProg.length ? `<button class="btn icon" type="button" data-clear aria-label="Clear" title="Start again">${icon('M6 6l12 12M18 6L6 18')}</button>` : '');
+      + (state.chordProg.length ? `<button class="btn icon act" type="button" data-loop aria-pressed="${!!chord.loop}" aria-label="${chord.loop ? 'Stop' : 'Loop the progression'}" title="${chord.loop ? 'Stop' : 'Loop the progression (metronome tempo)'}">${icon(chord.loop ? 'M6 6h12v12H6z' : 'M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4')}</button>` : '')
+      + (state.chordProg.length ? `<button class="btn icon act" type="button" data-undo aria-label="Back one chord" title="Back one chord">${icon('M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3')}</button>` : '')
+      + (has || state.chordProg.length ? `<button class="btn icon act" type="button" data-clear aria-label="Clear" title="Start again">${icon('M6 6l12 12M18 6L6 18')}</button>` : '');
     // the progression, with roman numerals; tap an earlier chord to go back to it
     const k = key || (info?.typeId ? { tonic: info.rootPc, mode: 'major' } : null);
     const num = (c) => (k && c.typeId ? `<sub>${numeral(c, k)}</sub>` : '');
@@ -979,9 +979,9 @@ function renderChord() {
     const n = chord.shapes.length;
     const sh = chord.shapes[state.chordShape];
     tools.innerHTML = n ? `<button class="btn icon" type="button" data-shape="-1" aria-label="Previous shape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>`
-      + `<span class="shape-num">${state.chordShape + 1} of ${n}</span>`
+      + `<span class="shape-num">${state.chordShape + 1}/${n}</span>`
       + `<button class="btn icon" type="button" data-shape="1" aria-label="Next shape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>`
-      + `<span class="shape-where">${sh.minFret === 0 || sh.frets.includes(0) && sh.minFret <= 3 ? 'Open position' : `${sh.barre ? 'Barre at' : 'Around'} fret ${sh.minFret}`}</span>` : '';
+      + `<span class="shape-where">${sh.minFret === 0 || sh.frets.includes(0) && sh.minFret <= 3 ? 'Open' : `${sh.barre ? 'Barre' : 'Fret'} ${sh.minFret}`}</span>` : '';
     $('#chord-count').textContent = n ? '' : 'No shape in this tuning';
   }
 

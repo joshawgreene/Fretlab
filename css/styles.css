@@ -244,13 +244,17 @@ body:not(.wide) #bar-seek { display: none; }
 /* minimized: Import as an icon on the left, a small centred pager, the full-width toggle on the right */
 body:not(.wide) #play-import span { display: none; }
 body:not(.wide) #play-import { padding: 6px; }
-body:not(.wide) .bar-pos { min-width: 5.5em; text-align: center; color: var(--ink); order: 1; }
+body:not(.wide) .bar-pos { min-width: 11ch; text-align: center; color: var(--ink); order: 1; }
 body:not(.wide) #bar-next { order: 2; }
 body:not(.wide) #bar-now { order: 3; }
 body:not(.wide) .bar-nav { gap: 2px; }
 body:not(.wide) .bar-nav .btn.icon { border-color: transparent; background: none; }
 body:not(.wide) #bar-now { padding: 3px 7px; font-size: 12px; margin-left: 4px; }
-.bar-pos { font: 700 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.bar-pos { font: 700 11px var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 17ch; }
+/* keep the slider and its arrows still while you drag: the label has a fixed width and the
+   'Back to bar' button keeps its space when it's hidden */
+.bar-nav #bar-now[hidden] { display: inline-flex !important; visibility: hidden; }
+#bar-now { min-width: 3.6em; justify-content: center; padding: 4px 8px; }
 #bar-now { white-space: nowrap; border-color: var(--accent); color: var(--accent); }
 .section-strip { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex: none; margin-bottom: 4px; }
 .section-strip .sec { border: 2px solid var(--ink); background: var(--surface); font: 800 12px var(--display); padding: 3px 8px; cursor: pointer; white-space: nowrap; }
@@ -550,7 +554,10 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   #chord-card .learn-where { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11.5px; }
   #chord-count { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; scrollbar-width: none; margin-top: 4px; }
   .chord-tools .chip-label { display: none; }
-  .chord-tools .btn.icon { order: -1; flex: none; }
+  .chord-tools .btn.act { order: -1; flex: none; }
+  .chord-tools .btn.icon { flex: none; }
+  .chord-tools .shape-num { min-width: 0; padding: 0 2px; }
+  .chord-tools .shape-where { padding-left: 8px; font-size: 12px; }
   .chord-tools .tools-gap { display: none; }
   .chord-tools .chip { flex: none; }
   .prog-step { font-size: 12px; }
@@ -574,7 +581,7 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .play-help-note { font-size: 11px; }
   .stave-tools { margin-bottom: 2px; }
   .section-strip .chip-label { display: none; }
-  body:not(.wide) .bar-pos { min-width: 0; }
+  body:not(.wide) .bar-pos { min-width: 5ch; }
   .section-strip { margin-bottom: 2px; }
   .section-strip .sec { padding: 1px 6px; font-size: 11px; }
   .bar-nav { gap: 4px; }
