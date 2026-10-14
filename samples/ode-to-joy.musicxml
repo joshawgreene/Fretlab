@@ -7,6 +7,7 @@
   <part id="P1">
     <measure number="1">
       <attributes><divisions>2</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line><clef-octave-change>-1</clef-octave-change></clef></attributes>
+      <direction placement="above"><direction-type><rehearsal>A</rehearsal></direction-type></direction>
       <note><pitch><step>E</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>quarter</type></note>
       <note><pitch><step>E</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>quarter</type></note>
       <note><pitch><step>F</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>quarter</type></note>
@@ -51,8 +52,10 @@
       <note><pitch><step>D</step><octave>3</octave></pitch><duration>3</duration><voice>1</voice><type>quarter</type><dot/></note>
       <note><pitch><step>C</step><octave>3</octave></pitch><duration>1</duration><voice>1</voice><type>eighth</type></note>
       <note><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration><voice>1</voice><type>half</type></note>
+      <barline location="right"><bar-style>light-light</bar-style></barline>
     </measure>
     <measure number="9">
+      <direction placement="above"><direction-type><rehearsal>B</rehearsal></direction-type></direction>
       <note><pitch><step>D</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>quarter</type></note>
       <note><pitch><step>D</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>quarter</type></note>
       <note><pitch><step>E</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>quarter</type></note>

@@ -77,6 +77,16 @@ for (const [bad, why] of [['<html><body>hi</body></html>', 'not MusicXML'], ['<s
 }
 check(parseXml('<a x="1 > 2"><b>t</b><c/></a>').children[0].attrs.x === '1 > 2', 'XML: quoted ">" inside attributes');
 
+// Song structure: rehearsal marks, section names (not expression words), segno, repeats, 1st/2nd endings, double bars
+const struct = readScore(await readFile(new URL('./structure.musicxml', import.meta.url), 'utf8'));
+const M = struct.measures;
+check(struct.sections.map((x) => `${x.number}:${x.label}`).join(' | ') === '1:A · Intro | 2:Verse | 5:B · Chorus | 8:D.C. al Fine', `sections found: ${struct.sections.map((x) => `${x.number} ${x.label}`).join(', ')}`);
+check(!M[1].marks.some((x) => x.text === 'dolce'), 'expression words (dolce) are not mistaken for sections');
+check(M[4].marks.some((x) => x.type === 'segno'), 'segno read');
+check(M[1].repeatStart && M[2].repeatEnd === 2 && M[2].ending === '1' && M[2].endingStop === 'stop' && M[3].ending === '2' && M[3].endingStop === 'discontinue', 'repeats and 1st/2nd endings read');
+check(M[3].barStyle === 'light-light' && M[2].barStyle === 'light-heavy', 'double and heavy barlines read');
+check(ode.sections.map((x) => x.label).join(' ') === 'A B' && ode.measures[7].barStyle === 'light-light', 'the sample has sections A and B with a double bar between');
+
 // ---------- 2. fingering ----------
 const fg = chooseFingering(odeEv, STD);
 check(fg.every((p, i) => STD[p.s] + p.f === odeEv[i].midi && p.f >= 0 && p.f <= 22), 'every note fingered on a real string and fret');

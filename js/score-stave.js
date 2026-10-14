@@ -16,6 +16,7 @@ const BEATS = { maxima: 32, long: 16, breve: 8, whole: 4, half: 2, quarter: 1, e
 const FLAGS = { eighth: 1, '16th': 2, '32nd': 3, '64th': 4 };
 
 const stepOf = (p) => p.octave * 7 + p.letter;
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 /** Vertical extent of the whole piece, so the stave doesn't jump about from bar to bar. */
 export function scoreRange(score) {
@@ -40,8 +41,13 @@ export function barWindow(score, m, wide) {
 export function renderScore(host, score, { start, count, cur = null, next = null, minWidth = 230, fit = null, single = false }) {
   const range = scoreRange(score);
   const pad = 8;
-  const y = (s) => pad + (range.top - s) * STEP;
+  // room above the stave for section marks and 1st/2nd-ending brackets, if the piece has any
+  const markRoom = !single && score.measures.some((m) => m.marks?.length || m.ending) ? 22 : 0;
+  const y = (s) => pad + markRoom + (range.top - s) * STEP;
   const H = y(range.bottom) + pad;
+  // which bars sit under a 1st/2nd-ending bracket (it can start before the bars shown)
+  const endings = [];
+  { let cur = null; score.measures.forEach((m, i) => { if (m.ending) cur = m.ending; endings[i] = cur ? { label: cur, starts: !!m.ending, stops: m.endingStop === 'stop' } : null; if (m.endingStop) cur = null; }); }
   if (fit && fit.w > 0 && fit.h > 0) minWidth = Math.max(minWidth, H * fit.w / fit.h);
   const order = (m, n) => m * 10000 + n;
   const curKey = cur ? order(cur.m, cur.n) : -1;
@@ -62,7 +68,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
   for (let b = start; b < start + count; b++) {
     const m = score.measures[b];
     const bar = { m, b, x0: x, items: [] };
-    let bx = 12;
+    let bx = 12 + (m.repeatStart ? 12 : 0); // room for a start-repeat sign
     if (b > start && m.keyChanged) { bar.keyAt = bx; bx += Math.abs(m.key) * 8 + 10; }
     if (b > start && m.timeChanged) { bar.timeAt = bx + 9; bx += 32; }
     const notes = [...m.notes].map((n, i) => ({ n, i })).sort((a, b2) => a.n.start - b2.n.start);
@@ -80,7 +86,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
       bar.items.push({ n, i, rel: bx + accW, acc, w });
       bx += accW + w;
     }
-    bar.inner = bx + 6;
+    bar.inner = bx + 6 + (m.repeatEnd ? 12 : 0);
     bars.push(bar);
     x += bar.inner;
   }
@@ -108,7 +114,37 @@ export function renderScore(host, score, { start, count, cur = null, next = null
           <circle class="st-clef-ball" cx="5.2" cy="54" r="4"/><text class="st-eight" x="16" y="70">8</text></g>`;
   svg += keySignature(keySig, head.keyX, y);
   if (showTime) svg += timeSignature(first.time, head.timeX, y);
-  if (bars[0] && !single) svg += `<text class="sc-barnum" x="${bars[0].x0 + 2}" y="${y(38) - 9}">${first.number}</text>`;
+  let hits = ''; // invisible tap areas, on top of everything: whole bars, then single notes
+  for (const bar of bars) {
+    if (single) break;
+    const m = bar.m;
+    hits += `<rect class="sc-hit" data-bar="${bar.b}" x="${bar.x0}" y="0" width="${Math.max(1, bar.x1 - bar.x0)}" height="${H}"/>`;
+    svg += `<text class="sc-barnum" x="${bar.x0 + 3}" y="${y(38) - 8}">${m.number}</text>`;
+    // section marks: rehearsal letters boxed, section names in bold italics
+    let mx = bar.x0 + 4;
+    for (const mk of m.marks || []) {
+      if (mk.type === 'rehearsal') {
+        const w = 8 + mk.text.length * 8;
+        svg += `<rect class="sc-reh" x="${mx}" y="${pad - 2}" width="${w}" height="16"/><text class="sc-reh-t" x="${mx + w / 2}" y="${pad + 10}">${esc(mk.text)}</text>`;
+        mx += w + 6;
+      } else {
+        svg += `<text class="sc-mark" x="${mx}" y="${pad + 10}">${esc(mk.text)}</text>`;
+        mx += mk.text.length * 6.5 + 8;
+      }
+    }
+    // 1st / 2nd ending bracket
+    const en = endings[bar.b];
+    if (en) {
+      const yv = pad + markRoom - 4;
+      svg += `<path class="sc-volta" d="M${bar.x0 + 2} ${en.starts ? yv + 9 : yv} L${bar.x0 + 2} ${yv} L${bar.x1 - 3} ${yv}${en.stops ? ` L${bar.x1 - 3} ${yv + 9}` : ''}"/>`;
+      if (en.starts) svg += `<text class="sc-volta-t" x="${bar.x0 + 6}" y="${yv + 10}">${esc(en.label.split(',').join('., '))}.</text>`;
+    }
+    // repeat signs
+    const dots = (x) => `<circle class="sc-dot-r" cx="${x}" cy="${y(35)}" r="1.9"/><circle class="sc-dot-r" cx="${x}" cy="${y(33)}" r="1.9"/>`;
+    if (m.repeatStart) svg += `<rect class="sc-final" x="${bar.x0}" y="${y(38)}" width="3.5" height="${y(30) - y(38)}"/><line class="st-line" x1="${bar.x0 + 6}" x2="${bar.x0 + 6}" y1="${y(38)}" y2="${y(30)}"/>${dots(bar.x0 + 10)}`;
+    if (m.repeatEnd) svg += `${dots(bar.x1 - 10)}<line class="st-line" x1="${bar.x1 - 6}" x2="${bar.x1 - 6}" y1="${y(38)}" y2="${y(30)}"/><rect class="sc-final" x="${bar.x1 - 3.5}" y="${y(38)}" width="3.5" height="${y(30) - y(38)}"/>`;
+    else if (m.barStyle === 'light-light') svg += `<line class="st-line" x1="${bar.x1 - 4}" x2="${bar.x1 - 4}" y1="${y(38)}" y2="${y(30)}"/>`;
+  }
 
   for (const bar of bars) {
     if (bar.keyAt !== undefined) svg += keySignature(bar.m.key, bar.x0 + bar.keyAt * stretch, y);
@@ -185,6 +221,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
       const cls = stateKey === curKey ? 'cur' : stateKey === nextKey ? 'next' : stateKey < curKey ? 'done' : '';
       if (cls === 'cur' && !n.tieStop) bands += `<rect class="sc-cur-band" x="${it.x - 13}" y="${y(40)}" width="26" height="${y(28) - y(40)}"/>`;
       svg += `<g class="sc-note ${cls}">${n.rest ? rest(n, it.x, y) : note(n, it, y, beamed.get(it))}</g>`;
+      if (!single && !n.rest) hits += `<rect class="sc-hit" data-m="${bar.b}" data-n="${it.i}" x="${it.x - 10}" y="${y(range.top)}" width="20" height="${y(range.bottom) - y(range.top)}"/>`;
       if (n.tieStart && !n.rest) {
         const nxt = bar.items[idx + 1] || null;
         const nextBar = bars.find((b2) => b2.b === bar.b + 1);
@@ -198,7 +235,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
     });
   }
 
-  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="stave-svg score-svg" role="img" aria-label="Bars ${first.number}${count > 1 ? '–' + score.measures[start + count - 1].number : ''}">${bands}${svg}</svg>`;
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="stave-svg score-svg" role="img" aria-label="Bars ${first.number}${count > 1 ? '–' + score.measures[start + count - 1].number : ''}">${bands}${svg}${hits}</svg>`;
 }
 
 function keyAlters(fifths) {

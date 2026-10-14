@@ -115,7 +115,13 @@ select {
   border: 2px solid var(--ink); padding: 7px 30px 7px 10px; font: 700 14px/1.2 var(--display); font-stretch: 105%; color: var(--ink); cursor: pointer;
   text-transform: none; letter-spacing: 0;
 }
-input[type="range"] { accent-color: var(--ink); width: 100%; }
+/* Sliders: flat, square, in the mode's colour (--pct = how far along, set by the app) */
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; margin: 0; cursor: pointer;
+  background: linear-gradient(to right, var(--accent) var(--pct, 50%), var(--surface-2) var(--pct, 50%)); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: var(--accent); border: 0; }
+input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 0; background: var(--accent); border: 0; }
+input[type="range"]::-moz-range-track { background: transparent; }
+input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
 .controls { gap: 8px; }
 .tabs { display: grid; grid-template-columns: repeat(5, 1fr); border: 2px solid var(--ink); }
@@ -126,7 +132,7 @@ input[type="range"] { accent-color: var(--ink); width: 100%; }
 .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
 .ctrl-row { display: flex; gap: 8px; align-items: stretch; }
 /* Mic sensitivity */
-.sens { display: flex; align-items: center; gap: 10px; font: 700 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sens { display: flex; align-items: center; gap: 10px; min-height: 20px; font: 700 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .sens input { flex: 1; margin: 0; }
 /* The big Listen button fills whatever room the controls module has left */
 .listen { flex: 1; min-height: 52px; flex-direction: column; gap: 6px; font-size: clamp(16px, 2.6vh, 24px); font-stretch: 125%; font-weight: 900; text-transform: uppercase; letter-spacing: .02em; }
@@ -144,7 +150,7 @@ input[type="range"] { accent-color: var(--ink); width: 100%; }
 }
 .metro-bpm span { font: 900 clamp(30px, 8vh, 64px)/.9 var(--display); font-stretch: 125%; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .metro-bpm small { font: 700 10px/1 var(--mono); letter-spacing: .1em; color: var(--muted); }
-.metro.running .metro-bpm span { color: var(--accent); }
+.metro-bpm span { color: var(--accent); }   /* BPM in the mode's colour */
 .metro.flash .metro-bpm span { animation: beat .12s ease-out; }
 @keyframes beat { 0% { transform: scale(1.06); } 100% { transform: scale(1); } }
 .metro-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; flex: none; }
@@ -229,6 +235,27 @@ details:not([open]) > :not(summary) { display: none !important; }
 /* Play: stave toolbar, help, fretboard */
 .stave-tools { display: flex; align-items: center; gap: 6px; flex: none; margin: -2px 0 6px; }
 .stave-tools-gap { flex: 1; }
+.bar-nav { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; }
+.bar-nav .btn.icon { padding: 5px; }
+.bar-nav .btn svg { width: 15px; height: 15px; }
+.bar-nav .btn:disabled { opacity: .3; }
+#bar-seek { width: clamp(80px, 22vw, 320px); }
+body:not(.wide) #bar-seek { display: none; }
+/* minimized: Import as an icon on the left, a small centred pager, the full-width toggle on the right */
+body:not(.wide) #play-import span { display: none; }
+body:not(.wide) #play-import { padding: 6px; }
+body:not(.wide) .bar-pos { min-width: 5.5em; text-align: center; color: var(--ink); order: 1; }
+body:not(.wide) #bar-next { order: 2; }
+body:not(.wide) #bar-now { order: 3; }
+body:not(.wide) .bar-nav { gap: 2px; }
+body:not(.wide) .bar-nav .btn.icon { border-color: transparent; background: none; }
+body:not(.wide) #bar-now { padding: 3px 7px; font-size: 12px; margin-left: 4px; }
+.bar-pos { font: 700 11px var(--mono); color: var(--muted); white-space: nowrap; }
+#bar-now { white-space: nowrap; border-color: var(--accent); color: var(--accent); }
+.section-strip { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex: none; margin-bottom: 4px; }
+.section-strip .sec { border: 2px solid var(--ink); background: var(--surface); font: 800 12px var(--display); padding: 3px 8px; cursor: pointer; white-space: nowrap; }
+.section-strip .sec small { font: 600 10px var(--mono); color: var(--muted); }
+.section-strip .sec.here { background: var(--accent-soft); border-color: var(--accent); }
 .stave-tools .btn.small { gap: 6px; }
 #play-mic { display: none; }
 body.wide #play-mic { display: inline-flex; }
@@ -257,15 +284,16 @@ body[data-view="play"].has-piece .stave-mod #stave { cursor: default; }
 
 /* Chords: the shape solid purple (root darker), other shapes / the next chord faded, × for strings left out */
 #chord-card .big-note { color: var(--accent); font-size: clamp(40px, 11vh, 110px); }
+#chord-card.long-name .big-note { font-size: clamp(30px, 7.5vh, 76px); }
 #chord-card .progress span { background: var(--accent); }
 .mute-x { opacity: 0; fill: var(--ink); font: 900 calc(var(--fb-font, 11px) * 2.1) var(--display); text-anchor: middle; pointer-events: none; }
 .pos.chord-mute .mute-x { opacity: 1; }
 .pos.chord-mute > text:not(.mute-x) { opacity: 0 !important; }
-.pos.chord-main rect { opacity: 1; fill: var(--accent); stroke: none; }
+.pos.chord-main rect { opacity: 1; fill: var(--accent); stroke: var(--ink); stroke-width: 2; transform: scale(1.12); }
 .pos.chord-main text:not(.mute-x) { opacity: 1; fill: var(--accent-ink); }
 .pos.chord-main.chord-root rect { fill: #4b12a8; }
-.pos.chord-ghost rect { opacity: 1; fill: var(--accent-ghost); stroke: none; }
-.pos.chord-ghost text:not(.mute-x) { opacity: 1; fill: #4b2a86; }
+.pos.chord-ghost rect { opacity: 1; fill: #e7dcff; stroke: none; transform: scale(.82); }
+.pos.chord-ghost text:not(.mute-x) { opacity: 1; fill: #7c67ad; font-weight: 700; }
 .pos.chord-done rect { fill: #cfc6e0 !important; }
 .pos.chord-done text:not(.mute-x) { fill: #6b6380 !important; }
 .pos.chord-target rect { stroke: var(--ink); stroke-width: 4; transform: scale(1.3); animation: target 1s steps(2, jump-none) infinite; }
@@ -285,6 +313,9 @@ body[data-view="play"].has-piece .stave-mod #stave { cursor: default; }
 .chip.tension { border-style: dashed; }
 .chip.surprise { border-style: dotted; border-width: 3px; }
 .tools-gap { flex: 1; }
+.label .num { text-transform: none; letter-spacing: 0; }
+.chord-tools .done-btn { gap: 6px; padding: 6px 12px; font-size: 14px; }
+.chord-tools .done-btn svg { stroke: currentColor; }
 .chord-tools .btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 #chord-count { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; color: var(--ink); }
 .prog-step { border: 0; background: none; padding: 1px 3px; font: 800 14px var(--display); color: var(--muted); cursor: pointer; }
@@ -330,6 +361,14 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
 .sc-time { fill: var(--ink); font: 900 21px/1 var(--display); font-stretch: 110%; text-anchor: middle; }
 .sc-key { font-size: 19px; }
 .sc-barnum { fill: var(--muted); font: 700 9px var(--mono); }
+.sc-hit { fill: transparent; cursor: pointer; }
+@media (hover: hover) { .sc-hit[data-m]:hover { fill: var(--accent); fill-opacity: .07; } }
+.sc-reh { fill: var(--surface); stroke: var(--ink); stroke-width: 1.6; }
+.sc-reh-t { fill: var(--ink); font: 900 12px var(--display); text-anchor: middle; }
+.sc-mark { fill: var(--ink); font: italic 800 11px var(--display); }
+.sc-volta { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.sc-volta-t { fill: var(--ink); font: 700 9px var(--mono); }
+.sc-dot-r { fill: var(--ink); }
 .st-8va { fill: var(--muted); font: italic 700 11px var(--display); }
 
 /* ---------- fretboard ---------- */
@@ -501,6 +540,14 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .learn-count { grid-area: count; margin: 3px 0 0; font-size: 11px; }
   .learn-card .progress { grid-area: bar; margin-top: 6px; height: 6px; }
   .chord-tools { grid-area: bar; margin-top: 4px; min-height: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  /* chord card: name left, label + notes right, then the progression and the tools — nothing spills out */
+  #chord-card { grid-template-columns: minmax(0, max-content) minmax(0, 1fr); grid-template-rows: auto auto 1fr auto auto;
+    grid-template-areas: "head head" "label label" "note where" "count count" "bar bar"; overflow: hidden; row-gap: 2px; }
+  #chord-card .learn-body .label { margin-top: 4px; }
+  #chord-card .big-note { max-width: 42vw; white-space: nowrap; }
+  #chord-card.long-name .big-note { font-size: clamp(22px, 9vh, 36px); }
+  #chord-card .learn-where { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11.5px; }
+  #chord-count { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; scrollbar-width: none; margin-top: 4px; }
   .chord-tools .chip-label { display: none; }
   .chord-tools .btn.icon { order: -1; flex: none; }
   .chord-tools .tools-gap { display: none; }
@@ -525,6 +572,12 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .play-help ol { gap: 3px; }
   .play-help-note { font-size: 11px; }
   .stave-tools { margin-bottom: 2px; }
+  .section-strip .chip-label { display: none; }
+  body:not(.wide) .bar-pos { min-width: 0; }
+  .section-strip { margin-bottom: 2px; }
+  .section-strip .sec { padding: 1px 6px; font-size: 11px; }
+  .bar-nav { gap: 4px; }
+  #bar-now { padding: 4px 7px; }
   .stave-tools .btn.small { padding: 4px 7px; font-size: 12px; }
   .stave-tools .btn.icon { padding: 4px; }
   .stave-tools .btn svg { width: 15px; height: 15px; }
@@ -545,5 +598,6 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .tabs button { min-height: 32px; padding: 4px 2px; }
   .tabs svg { width: 19px; height: 19px; }
   .stave-tools #play-import span { display: none; }
+  body.has-piece:not(.wide) #play-import { display: none; }   /* tiny: Import lives in the piece menu */
   .count-extra { display: none; }
 }

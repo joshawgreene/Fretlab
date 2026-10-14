@@ -146,6 +146,14 @@ export function readScore(xmlText, { part = 0, tuning = [40, 45, 50, 55, 59, 64]
   const composer = kids(kid(root, 'identification'), 'creator').find((c) => c.attrs.type === 'composer')?.text.trim() || '';
 
   const measures = readPart(partEls[partIndex]);
+  partEls.forEach((pe, pi) => {
+    if (pi === partIndex) return;
+    kids(pe, 'measure').forEach((mEl, mi) => {
+      const m = measures[mi];
+      if (!m) return;
+      for (const d of kids(mEl, 'direction')) for (const mark of structureMarks(d)) if (!m.marks.some((x) => x.text === mark.text)) m.marks.push(mark);
+    });
+  });
   if (!measures.some((m) => m.notes.some((n) => !n.rest))) throw new ScoreError('This part has no notes to play. If the score has several parts, try another.');
 
   // Octave: shift the whole piece by octaves if that fits the guitar's range better.
@@ -157,7 +165,9 @@ export function readScore(xmlText, { part = 0, tuning = [40, 45, 50, 55, 59, 64]
   if (shift) for (const m of measures) for (const n of m.notes) for (const p of n.pitches) { p.midi += shift; p.octave += shift / 12; }
   for (const m of measures) for (const n of m.notes) for (const p of n.pitches) p.playable = p.midi >= lo && p.midi <= hi;
 
-  return { title, composer, parts, partIndex, measures, octaveShift: shift };
+  // the sections, for jumping around: every bar with a rehearsal mark or section name
+  const sections = measures.map((m, i) => ({ bar: i, number: m.number, label: m.marks.filter((x) => x.type !== 'segno').map((x) => x.text).join(' · ') })).filter((x) => x.label);
+  return { title, composer, parts, partIndex, measures, octaveShift: shift, sections };
 }
 
 function readPart(partEl) {
@@ -165,7 +175,8 @@ function readPart(partEl) {
   let divisions = 1, key = 0, time = { beats: 4, beatType: 4 }, clefOctave = null, transpose = 0;
   let mainVoice = null;
   for (const mEl of kids(partEl, 'measure')) {
-    const m = { number: mEl.attrs.number || String(measures.length + 1), notes: [], keyChanged: measures.length === 0, timeChanged: measures.length === 0 };
+    const m = { number: mEl.attrs.number || String(measures.length + 1), notes: [], keyChanged: measures.length === 0, timeChanged: measures.length === 0,
+      marks: [], repeatStart: false, repeatEnd: 0, ending: null, endingStop: false, barStyle: null };
     let cursor = 0, lastStart = 0, maxCursor = 0;
     for (const el of mEl.children) {
       if (el.name === 'attributes') {
@@ -188,6 +199,21 @@ function readPart(partEl) {
         }
         const tr = kid(el, 'transpose');
         if (tr) transpose = num(tr, 'chromatic', 0) + 12 * num(tr, 'octave-change', 0);
+      } else if (el.name === 'barline') {
+        // repeats, 1st/2nd endings, double bars
+        const loc = el.attrs.location || 'right';
+        const rp = kid(el, 'repeat');
+        if (rp?.attrs.direction === 'forward') m.repeatStart = true;
+        if (rp?.attrs.direction === 'backward') m.repeatEnd = Number(rp.attrs.times) || 2;
+        const en = kid(el, 'ending');
+        if (en) {
+          if (en.attrs.type === 'start') m.ending = (en.attrs.number || '1').replace(/\s+/g, '');
+          else m.endingStop = en.attrs.type || 'stop'; // 'stop' has a closing hook, 'discontinue' doesn't
+        }
+        const style = txt(el, 'bar-style');
+        if (style && loc === 'right') m.barStyle = style;
+      } else if (el.name === 'direction') {
+        for (const mark of structureMarks(el)) if (!m.marks.some((x) => x.text === mark.text)) m.marks.push(mark);
       } else if (el.name === 'backup') { cursor -= num(el, 'duration', 0); }
       else if (el.name === 'forward') { cursor += num(el, 'duration', 0); maxCursor = Math.max(maxCursor, cursor); }
       else if (el.name === 'note') {
@@ -232,6 +258,20 @@ function readPart(partEl) {
     measures.push(m);
   }
   return measures;
+}
+
+// Section names worth showing (expression words like "dolce" or "rit." are left out)
+const SECTION_WORDS = /^\s*(intro|verse|chorus|pre-?\s?chorus|bridge|outro|solo|interlude|instrumental|coda|tag|refrain|break(down)?|ending|fine|d\.?\s?c\.?|d\.?\s?s\.?|da capo|dal segno|to coda|al coda|al fine|section|part|theme|middle\s?8|hook|riff|[A-H]['′]?\d?)\b/i;
+/** Rehearsal marks, section names, segno and coda in a <direction>. */
+function structureMarks(dirEl) {
+  const out = [];
+  for (const dt of kids(dirEl, 'direction-type')) {
+    for (const r of kids(dt, 'rehearsal')) if (r.text.trim()) out.push({ type: 'rehearsal', text: r.text.trim() });
+    for (const w of kids(dt, 'words')) { const t = w.text.trim(); if (t && t.length <= 24 && SECTION_WORDS.test(t)) out.push({ type: 'words', text: t }); }
+    if (kid(dt, 'segno')) out.push({ type: 'segno', text: 'Segno' });
+    if (kid(dt, 'coda')) out.push({ type: 'coda', text: 'Coda' });
+  }
+  return out;
 }
 
 function pitchOf(noteEl, clefOctave, transpose) {

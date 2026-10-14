@@ -28,6 +28,14 @@
           <button class="btn small" id="play-import" type="button" title="Open a MusicXML file">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M4 14v6h16v-6"/></svg><span>Import</span></button>
           <span class="stave-tools-gap"></span>
+          <div class="bar-nav" id="bar-nav" hidden>
+            <button class="btn icon" id="bar-prev" type="button" aria-label="Earlier bars" title="Earlier bars (←)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+            <input type="range" id="bar-seek" min="0" max="0" value="0" step="1" aria-label="Browse the bars" />
+            <button class="btn icon" id="bar-next" type="button" aria-label="Later bars" title="Later bars (→)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+            <span class="bar-pos" id="bar-pos"></span>
+            <button class="btn small" id="bar-now" type="button" hidden>Back to bar 1</button>
+          </div>
+          <span class="stave-tools-gap"></span>
           <button class="btn icon" id="play-mic" type="button" aria-label="Start listening" title="Listen">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
           <button class="btn icon" id="play-wide" type="button" aria-pressed="false" aria-label="Full width" title="Full width: four bars at a time">
@@ -35,6 +43,7 @@
             <svg class="shrink-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6"/></svg></button>
           <input type="file" id="play-file" hidden />
         </header>
+        <div class="section-strip" id="section-strip" hidden></div>
         <div id="stave"></div>
         <div class="play-help" id="play-help" hidden>
           <p class="play-help-title">Play a piece of music</p>
