@@ -8,7 +8,7 @@ const LINES = [30, 32, 34, 36, 38];
 
 // Normal: room for the full range. Compact (landscape phones): cropped tight to the clef and
 // written 8va a little sooner, so the staff can be drawn much bigger in a short space.
-const LAYOUTS = {
+export const LAYOUTS = {
   normal: { top: 46, bottom: 21, pad: 12, width: 210, noteX: 140, ottavaAbove: 44 },
   compact: { top: 43, bottom: 21, pad: 5, width: 250, noteX: 165, ottavaAbove: 41 },
 };
@@ -26,7 +26,7 @@ export const CLEF = 'M 15.8 51 L 16.3 1 C 16.5 -6, 21.5 -14.5, 25 -13 C 28.5 -11
 const NATURAL_PC = [0, 2, 4, 5, 7, 9, 11];
 const ACC_GLYPH = { '-2': '𝄫', '-1': '♭', 1: '♯', 2: '𝄪' };
 
-export function renderStave(host, midi, pref = 'sharp', { compact = false, spelled = null } = {}) {
+export function renderStave(host, midi, pref = 'sharp', { compact = false, spelled = null, scale = null } = {}) {
   L = compact ? LAYOUTS.compact : LAYOUTS.normal;
   const WIDTH = L.width, HEIGHT = yOf(L.bottom) + L.pad, NOTE_X = L.noteX;
   const ledger = (y) => `<line class="st-ledger" x1="${NOTE_X - 13}" x2="${NOTE_X + 13}" y1="${y}" y2="${y}"/>`;
@@ -62,7 +62,8 @@ export function renderStave(host, midi, pref = 'sharp', { compact = false, spell
     label = ottava ? ' (written 8va)' : '';
   }
 
-  host.innerHTML = `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" class="stave-svg" role="img"
+  const size = scale ? ` style="width:${Math.round(WIDTH * scale)}px;height:${Math.round(HEIGHT * scale)}px"` : '';
+  host.innerHTML = `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" class="stave-svg"${size} role="img"
     aria-label="Stave${label}">${body}</svg>`;
 }
 

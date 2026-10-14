@@ -176,6 +176,7 @@ details:not([open]) > :not(summary) { display: none !important; }
 .custom-panel { right: 10px; top: calc(100% + 4px); }
 .custom-panel { width: min(340px, calc(100vw - 32px)); }
 .picker-panel { left: 0; }
+#chord-picker .picker-panel { width: min(300px, calc(100vw - 32px)); }
 .custom-title { margin: 0; font-weight: 800; }
 .custom-title span { color: var(--muted); font-weight: 500; }
 .custom-strings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -379,6 +380,14 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
 .sc-volta { fill: none; stroke: var(--ink); stroke-width: 1.3; }
 .sc-volta-t { fill: var(--ink); font: 700 9px var(--mono); }
 .sc-dot-r { fill: var(--ink); }
+.sc-chord { fill: var(--ink); font: 900 15px var(--display); font-stretch: 110%; text-anchor: middle; }
+.sc-chord.cur { fill: var(--accent); }
+.sc-chord.next { fill: var(--accent-ghost); }
+.sc-sub { fill: var(--muted); font: 700 10px var(--mono); text-anchor: middle; }
+.sc-sub.cur { fill: var(--accent); }
+.sc-sub.next { fill: var(--accent-ghost); }
+.chording-stave .sc-hit[data-bar] { cursor: pointer; }
+@media (hover: hover) { .chording-stave .sc-hit[data-bar]:hover { fill: var(--accent); fill-opacity: .06; } }
 .st-8va { fill: var(--muted); font: italic 700 11px var(--display); }
 
 /* ---------- fretboard ---------- */
@@ -552,7 +561,9 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .chord-tools { grid-area: bar; margin-top: 4px; min-height: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   /* chord card: name left, label + notes right, then the progression and the tools — nothing spills out */
   #chord-card { grid-template-columns: minmax(0, max-content) minmax(0, 1fr); grid-template-rows: auto auto 1fr auto auto;
-    grid-template-areas: "head head" "label label" "note where" "count count" "bar bar"; overflow: hidden; row-gap: 2px; }
+    grid-template-areas: "head head" "label label" "note where" "count count" "bar bar"; row-gap: 2px; }
+  #chord-card > .learn-body > *, #chord-card > .learn-foot > * { min-width: 0; }
+  #chord-card .big-note { overflow: hidden; }
   #chord-card .learn-body .label { margin-top: 4px; }
   #chord-card .big-note { max-width: 42vw; white-space: nowrap; }
   #chord-card.long-name .big-note { font-size: clamp(22px, 9vh, 36px); }
@@ -560,6 +571,8 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   #chord-count { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; scrollbar-width: none; margin-top: 4px; }
   .chord-tools .chip-label { display: none; }
   .chord-tools .btn.act { order: -1; flex: none; }
+  #chord-card.drawing #chord-count:not(:has(*)) { display: none; }   /* the 'tap a chord on the stave' hint: no room on phones */
+  .chord-tools .btn.small { flex: none; }
   .chord-tools .btn.icon { flex: none; }
   .chord-tools .shape-num { min-width: 0; padding: 0 2px; }
   .chord-tools .shape-where { padding-left: 8px; font-size: 12px; }

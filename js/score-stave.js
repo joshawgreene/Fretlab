@@ -38,13 +38,24 @@ export function barWindow(score, m, wide) {
  * @param {{start:number, count:number, cur?:{m,n}|null, next?:{m,n}|null, minWidth?:number, fit?:{w:number,h:number}}} view
  *   fit: the box it's drawn in — the bars are spread to match its shape, so the stave fills it
  */
-export function renderScore(host, score, { start, count, cur = null, next = null, minWidth = 230, fit = null, single = false }) {
-  const range = scoreRange(score);
-  const pad = 8;
+export function renderScore(host, score, { start, count, cur = null, next = null, minWidth = 230, fit = null, single = false, labels = false, frame = null, scale = null, box = null }) {
+  // scale (px per unit) + box (the space available): draw at that one size, shrinking only if it won't fit
+  // frame: { top, bottom, pad } — the same vertical frame as the one-note stave in the other modes, so the
+  // stave is drawn at one size everywhere (it only grows for a note too high or low to fit)
+  // labels: a chord progression — each bar's chord name above it (m.label) and its numeral below (m.sub),
+  // no bar numbers, and no final barline (the progression carries on)
+  let range = scoreRange(score);
+  let pad = 8;
+  if (frame) {
+    const r = range;
+    range = { top: Math.max(frame.top, r.top - 4 + 2), bottom: Math.min(frame.bottom, r.bottom + 3 - 2) }; // only grow when a note needs it
+    pad = frame.pad;
+  }
   // room above the stave for section marks and 1st/2nd-ending brackets, if the piece has any
-  const markRoom = !single && score.measures.some((m) => m.marks?.length || m.ending) ? 22 : 0;
+  const markRoom = frame ? 0 : labels ? 24 : !single && score.measures.some((m) => m.marks?.length || m.ending) ? 22 : 0;
+  const subRoom = frame ? 0 : labels ? 16 : 0;
   const y = (s) => pad + markRoom + (range.top - s) * STEP;
-  const H = y(range.bottom) + pad;
+  const H = y(range.bottom) + pad + subRoom;
   // which bars sit under a 1st/2nd-ending bracket (it can start before the bars shown)
   const endings = [];
   { let cur = null; score.measures.forEach((m, i) => { if (m.ending) cur = m.ending; endings[i] = cur ? { label: cur, starts: !!m.ending, stops: m.endingStop === 'stop' } : null; if (m.endingStop) cur = null; }); }
@@ -82,7 +93,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
         if (p.alter !== cur0) { acc.push(p.alter); accState[k] = p.alter; } else acc.push(null);
       }
       const accW = acc.some((a) => a !== null) ? 10 : 0;
-      const w = n.wholeBarRest ? 40 : 12 + 20 * Math.sqrt(beats) + (n.dots ? 5 : 0);
+      const w = labels ? 30 : n.wholeBarRest ? 40 : 12 + 20 * Math.sqrt(beats) + (n.dots ? 5 : 0);
       bar.items.push({ n, i, rel: bx + accW, acc, w });
       bx += accW + w;
     }
@@ -94,7 +105,10 @@ export function renderScore(host, score, { start, count, cur = null, next = null
   const natural = x + 4;
   const barsFrom = bars[0]?.x0 ?? x;
   const sumInner = bars.reduce((a, b) => a + b.inner, 0) || 1;
-  const stretch = natural < minWidth ? (minWidth - 4 - barsFrom) / sumInner : 1;
+  // spread out to fill the width; or, drawing at a fixed size, squeeze the notes a little rather than shrink the stave
+  const room = scale && box ? box.w / scale - 2 : Infinity;
+  const stretch = natural < minWidth ? (minWidth - 4 - barsFrom) / sumInner
+    : natural > room ? Math.max(0.6, (room - 4 - barsFrom) / sumInner) : 1;
   let bx0 = barsFrom;
   for (const bar of bars) {
     bar.x0 = bx0;
@@ -103,7 +117,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
     if (bar.items.length === 1 && bar.items[0].n.wholeBarRest) bar.items[0].x = (bar.x0 + bar.x1) / 2;
     bx0 = bar.x1;
   }
-  const W = Math.max(natural, minWidth) + 2;
+  const W = Math.max(barsFrom + sumInner * stretch + 4, Math.min(minWidth, room)) + 2;
 
   // ---- drawing ----
   let svg = '', bands = ''; // bands: the highlight behind the note to play, drawn under everything
@@ -119,7 +133,13 @@ export function renderScore(host, score, { start, count, cur = null, next = null
     if (single) break;
     const m = bar.m;
     hits += `<rect class="sc-hit" data-bar="${bar.b}" x="${bar.x0}" y="0" width="${Math.max(1, bar.x1 - bar.x0)}" height="${H}"/>`;
-    svg += `<text class="sc-barnum" x="${bar.x0 + 3}" y="${y(38) - 8}">${m.number}</text>`;
+    if (m.ottava && bar.items[0]) svg += `<text class="st-8va" x="${bar.items[0].x + 9}" y="${y(Math.max(...bar.items[0].n.pitches.map(stepOf))) - 6}">8va</text>`;
+    if (labels) {
+      const cx = bar.items[0] ? bar.items[0].x : (bar.x0 + bar.x1) / 2;
+      const state = bar.b === cur?.m ? ' cur' : bar.b === next?.m ? ' next' : '';
+      if (m.label) svg += `<text class="sc-chord${state}" x="${cx}" y="${pad + 14}">${esc(m.label)}</text>`;
+      if (m.sub) svg += `<text class="sc-sub${state}" x="${cx}" y="${H - pad + 2}">${esc(m.sub)}</text>`;
+    } else svg += `<text class="sc-barnum" x="${bar.x0 + 3}" y="${y(38) - 8}">${m.number}</text>`;
     // section marks: rehearsal letters boxed, section names in bold italics
     let mx = bar.x0 + 4;
     for (const mk of m.marks || []) {
@@ -150,7 +170,7 @@ export function renderScore(host, score, { start, count, cur = null, next = null
     if (bar.keyAt !== undefined) svg += keySignature(bar.m.key, bar.x0 + bar.keyAt * stretch, y);
     if (bar.timeAt !== undefined) svg += timeSignature(bar.m.time, bar.x0 + bar.timeAt * stretch, y);
     const last = bar.b === score.measures.length - 1;
-    if (single) { /* a lone chord: no barlines */ } else if (last) svg += `<line class="st-line" x1="${bar.x1 - 7}" x2="${bar.x1 - 7}" y1="${y(38)}" y2="${y(30)}"/>`
+    if (single) { /* a lone chord: no barlines */ } else if (last && !labels) svg += `<line class="st-line" x1="${bar.x1 - 7}" x2="${bar.x1 - 7}" y1="${y(38)}" y2="${y(30)}"/>`
       + `<rect class="sc-final" x="${bar.x1 - 4}" y="${y(38)}" width="4" height="${y(30) - y(38)}"/>`;
     else svg += `<line class="st-line" x1="${bar.x1}" x2="${bar.x1}" y1="${y(38)}" y2="${y(30)}"/>`;
 
@@ -235,7 +255,16 @@ export function renderScore(host, score, { start, count, cur = null, next = null
     });
   }
 
-  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="stave-svg score-svg" role="img" aria-label="Bars ${first.number}${count > 1 ? '–' + score.measures[start + count - 1].number : ''}">${bands}${svg}${hits}</svg>`;
+  let size = '';
+  if (scale && box) {
+    const k = Math.min(scale, box.w / W, box.h / H); // only ever smaller than the shared size, never bigger
+    size = ` style="width:${Math.round(W * k)}px;height:${Math.round(H * k)}px"`;
+  }
+  if (single && first.ottava && bars[0]?.items[0]) {
+    const it0 = bars[0].items[0];
+    svg += `<text class="st-8va" x="${it0.x + 9}" y="${y(Math.max(...it0.n.pitches.map(stepOf))) - 6}">8va</text>`;
+  }
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="stave-svg score-svg"${size} role="img" aria-label="Bars ${first.number}${count > 1 ? '–' + score.measures[start + count - 1].number : ''}">${bands}${svg}${hits}</svg>`;
 }
 
 function keyAlters(fifths) {

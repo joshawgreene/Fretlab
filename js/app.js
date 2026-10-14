@@ -1,7 +1,7 @@
 import { TUNINGS, parseNote, midiToFreq, noteName, octaveOf, enharmonic, customNoteRange } from './notes.js';
 import { PitchListener } from './audio.js';
 import { Fretboard } from './fretboard.js';
-import { renderStave } from './stave.js';
+import { renderStave, LAYOUTS } from './stave.js';
 import { Tuner } from './tuner.js';
 import { Metronome } from './metronome.js';
 import { SCALES, ROOTS, scaleById, scalePcs, chordPcs, scaleSpelling, keyPref, rootName, positions, buildPath } from './scales.js';
@@ -60,6 +60,22 @@ const notePref = () => (state.view === 'learn' ? keyPref(state.learnRoot, state.
   : state.view === 'chords' ? chordPref() : currentTuning().pref);
 
 const staveCompact = () => window.innerHeight < 760;
+/** The one vertical frame every stave uses (same as the one-note stave), so it's the same size in every mode. */
+const staveFrame = () => { const L = staveCompact() ? LAYOUTS.compact : LAYOUTS.normal; return { top: L.top, bottom: L.bottom, pad: L.pad }; };
+/** Pixels per stave unit for the stave module: the one-note stave filling the module. Every stave uses it. */
+function staveScale() {
+  const L = staveCompact() ? LAYOUTS.compact : LAYOUTS.normal;
+  const box = $('#stave').getBoundingClientRect();
+  if (!(box.width > 0 && box.height > 0)) return null;
+  // the same height in every mode: where there's no toolbar above the stave (Play has one), leave the room it would take
+  const tools = $('#stave-tools');
+  const toolsShown = tools && getComputedStyle(tools).display !== 'none';
+  const reserve = toolsShown ? 0 : (innerHeight <= 500 ? 30 : 40);
+  const H = (L.top - L.bottom) * 5 + 2 * L.pad;
+  const k = Math.min((box.height - reserve) / H, box.width / L.width);
+  return state.view === 'play' && state.playWide ? box.height / H : k; // full width: as big as it'll go
+}
+const staveBox = () => { const b = $('#stave').getBoundingClientRect(); return { w: b.width, h: b.height }; };
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
@@ -381,7 +397,7 @@ function renderLearn() {
   const lastRun = learn.lastRun ? ` · last ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '';
   const posNum = state.learnAuto ? `Pos ${state.learnPosition.replace('pos-', '')} · ` : '';
   $('#learn-count').textContent = `${posNum}${learn.index + 1} of ${total}${lastRun}`;
-  renderStave($('#stave'), t.midi, pref, { compact: staveCompact(), spelled: sp });
+  renderStave($('#stave'), t.midi, pref, { compact: staveCompact(), spelled: sp, scale: staveScale() });
 }
 
 /** Play the scale through once, lighting each note. */
@@ -585,7 +601,8 @@ function renderPlay() {
   if (!showHelp) {
     const box = $('#stave').getBoundingClientRect();
     const view = shownBars();
-    renderScore($('#stave'), score, { ...view, cur: t, next: nx, minWidth: state.playWide ? 520 : 200, fit: { w: box.width, h: box.height } });
+    const k = staveScale();
+    renderScore($('#stave'), score, { ...view, cur: t, next: nx, minWidth: k ? box.width / k - 2 : 200, frame: staveFrame(), scale: k, box: staveBox() });
     // browsing controls
     const N = score.measures.length, last = view.start + view.count - 1;
     $('#bar-nav').hidden = N <= view.count;
@@ -707,7 +724,8 @@ function stopPlayDemo() {
 }
 
 // ---------- Chords: look a chord up, draw one to name it, practise plucking it ----------
-const chord = { shapes: [], all: [], practice: false, path: [], index: 0, started: 0, lastRun: 0, fw: makeFollower(), sel: 0, trail: [], suggestions: [], demo: null };
+const chord = { shapes: [], all: [], practice: false, path: [], index: 0, started: 0, lastRun: 0, fw: makeFollower(), sel: 0, trail: [], suggestions: [], demo: null,
+  viewIdx: null }; // Draw: an earlier chord of the progression you've tapped on the stave to look at (null = the current one)
 const NATURAL_PC = [0, 2, 4, 5, 7, 9, 11];
 const MINOR_TYPES = ['min', 'm7', 'm6', 'm9', 'dim', 'm7b5', 'dim7'];
 
@@ -752,9 +770,15 @@ $('#chord-tools').addEventListener('click', (e) => {
     chordChanged(); return;
   }
   if (b.dataset.done !== undefined) { state.chordDone = true; chord.sel = 0; strum(state.chordDrawn); chordChanged(); return; }
-  if (b.dataset.undo !== undefined) { stopLoop(); const last = state.chordProg.pop(); if (last) { state.chordDrawn = last.frets.slice(); state.chordDone = true; } chord.sel = 0; chordChanged(); return; }
-  if (b.dataset.clear !== undefined) { stopLoop(); state.chordDrawn = state.chordDrawn.map(() => -1); state.chordProg = []; state.chordDone = false; chord.sel = 0; chordChanged(); return; }
-  if (b.dataset.loop !== undefined) { chord.loop ? stopLoop() : startLoop(); renderChord(); }
+  if (b.dataset.undo !== undefined) { chord.viewIdx = null; stopLoop(); const last = state.chordProg.pop(); if (last) { state.chordDrawn = last.frets.slice(); state.chordDone = true; } chord.sel = 0; chordChanged(); return; }
+  if (b.dataset.viewback !== undefined) { chord.viewIdx = null; renderChord(); return; }
+  if (b.dataset.fromhere !== undefined && viewing()) { // carry on from the chord you're looking at
+    const i = chord.viewIdx;
+    state.chordDrawn = state.chordProg[i].frets.slice(); state.chordProg = state.chordProg.slice(0, i);
+    state.chordDone = true; chord.viewIdx = null; chord.sel = 0; chordChanged(); return;
+  }
+  if (b.dataset.clear !== undefined) { chord.viewIdx = null; stopLoop(); state.chordDrawn = state.chordDrawn.map(() => -1); state.chordProg = []; state.chordDone = false; chord.sel = 0; chordChanged(); return; }
+  if (b.dataset.loop !== undefined) { chord.viewIdx = null; chord.loop ? stopLoop() : startLoop(); renderChord(); }
 });
 // Tap an earlier chord in the progression to go back to it
 $('#chord-count').addEventListener('click', (e) => {
@@ -776,6 +800,7 @@ function moveTo(sg) {
   state.chordProg.push({ rootPc: info?.rootPc ?? null, typeId: info?.typeId ?? null, name: info?.name || '?', frets: state.chordDrawn.slice() });
   state.chordDrawn = sg.shape.frets.slice();
   state.chordDone = true; // a suggested chord is complete already
+  chord.viewIdx = null;
   chord.sel = 0;
   strum(state.chordDrawn);
 }
@@ -814,16 +839,19 @@ function chordInfo() {
   return { rootPc: state.chordRoot, typeId: state.chordType, name: chordName(state.chordRoot, state.chordType), notes: [...sp.values()].map((x) => x.name) };
 }
 function chordPref() {
-  const info = chordInfo();
+  const info = shownChordInfo();
   if (!info?.typeId) return currentTuning().pref;
   return [...chordSpelling(info.rootPc, info.typeId).values()].some((x) => x.acc < 0) ? 'flat' : 'sharp';
 }
 function chordLabel(midi) {
-  const info = chordInfo();
+  const info = shownChordInfo();
   const sp = info?.typeId ? chordSpelling(info.rootPc, info.typeId).get(((midi % 12) + 12) % 12) : null;
   return sp ? sp.name : noteName(midi, chordPref());
 }
-const currentFrets = () => (state.chordDraw ? (chord.loop ? chord.loop.seq[chord.loop.i].frets : state.chordDrawn) : chord.shapes[state.chordShape]?.frets || []);
+const viewing = () => state.chordDraw && !chord.loop && chord.viewIdx !== null && !!state.chordProg[chord.viewIdx];
+const currentFrets = () => (state.chordDraw ? (chord.loop ? chord.loop.seq[chord.loop.i].frets : viewing() ? state.chordProg[chord.viewIdx].frets : state.chordDrawn) : chord.shapes[state.chordShape]?.frets || []);
+/** The chord on show: the shape you're on, the one you've drawn, or an earlier one you're looking at. */
+const shownChordInfo = () => (state.chordDraw ? identifyChord(fretNotes(currentFrets())) : chordInfo());
 
 function chordChanged() { save(); applyAll(); }
 
@@ -853,6 +881,7 @@ function rebuildChord() {
 
 function drawTap(s, f) {
   stopLoop();
+  chord.viewIdx = null;
   state.chordDrawn[s] = state.chordDrawn[s] === f ? -1 : f; // tap again to take it off
   state.chordDone = false; // changing the chord: back to drawing until Done
   chord.sel = 0;
@@ -863,7 +892,7 @@ function drawTap(s, f) {
 function buildPracticePath() {
   const { notes } = currentTuning();
   const frets = currentFrets();
-  const info = chordInfo();
+  const info = shownChordInfo();
   const strings = frets.map((f, s) => (f >= 0 ? { s, f, midi: notes[s] + f } : null)).filter(Boolean).sort((a, b) => a.midi - b.midi);
   const r = info?.rootPc ?? null;
   const k = r === null ? 0 : Math.max(0, strings.findIndex((x) => ((x.midi - r) % 12 + 12) % 12 === 0));
@@ -912,7 +941,7 @@ function strum(frets, volume = 0.55) {
 function renderChord() {
   const active = state.view === 'chords';
   if (!active) { fretboard.setChord(null); return; }
-  const info = chordInfo();
+  const info = shownChordInfo();
   const frets = currentFrets();
   const has = frets.some((f) => f >= 0);
   const drawing = state.chordDraw;
@@ -925,7 +954,7 @@ function renderChord() {
 
   // fretboard
   let ghosts = [], stay = [];
-  const sug = drawing && !chord.loop && state.chordDone ? chord.suggestions[chord.sel] : null;
+  const sug = drawing && !chord.loop && !viewing() && state.chordDone ? chord.suggestions[chord.sel] : null;
   if (!chord.practice) {
     if (drawing) { if (sug?.shape) { ghosts = sug.shape.frets.map((f, s) => (f >= 0 ? { s, f } : null)).filter(Boolean); stay = sug.stay; } }
     else chord.shapes.forEach((sh, i) => { if (i !== state.chordShape) sh.frets.forEach((f, s) => { if (f >= 0) ghosts.push({ s, f }); }); });
@@ -953,10 +982,11 @@ function renderChord() {
     tools.innerHTML = '';
   } else if (drawing) {
     const key = chord.key;
-    const showing = chord.loop ? shownInfo : info; // while looping: the chord being played
+    const showing = info; // the chord on show (while looping: the one being played)
     const cur = showing?.typeId ? numeral(showing, key || { tonic: showing.rootPc, mode: 'major' }) : '';
     const done = state.chordDone || !!chord.loop;
-    $('#chord-label').innerHTML = !has ? 'Draw' : !done ? 'Drawing…' : key && showing?.typeId ? `${key.name}${key.sure ? '' : ' ?'} · <span class="num">${cur}</span>` : 'You drew';
+    $('#chord-label').innerHTML = !has ? 'Draw' : !done && !viewing() ? 'Drawing…' : key && showing?.typeId
+      ? `${key.name}${key.sure ? '' : ' ?'} · <span class="num">${cur}</span>${viewing() ? ` · chord ${chord.viewIdx + 1} of ${state.chordProg.length + 1}` : ''}` : 'You drew';
     if (chord.loop) {
       $('#chord-name').textContent = chord.loop.seq[chord.loop.i].name;
       $('#chord-notes').textContent = showing?.notes ? `${showing.notes.join(' · ')} — playing bar ${chord.loop.i + 1} of ${chord.loop.seq.length}` : '';
@@ -967,7 +997,13 @@ function renderChord() {
         `<button class="chip ${g}" type="button" data-next="${i}" aria-pressed="${i === chord.sel}" title="${x.numeral} — ${x.why}${i === chord.sel ? ' · tap again to use it' : ''}">${x.name}</button>`).join('') : '';
     };
     const icon = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
-    tools.innerHTML = (done ? group('safe', 'Next') + group('tension', 'Tension') + group('surprise', 'Surprise')
+    const looking = viewing();
+    tools.innerHTML = looking
+      ? `<button class="btn small" type="button" data-viewback title="Back to the chord you're on">↩ ${escapeHtml(chordInfo()?.name || 'current')}</button>`
+        + `<button class="btn small" type="button" data-fromhere title="Make this the current chord and carry on from here (the chords after it are dropped)">From here</button>`
+        + `<span class="tools-gap"></span>`
+        + `<button class="btn icon act" type="button" data-clear aria-label="Clear" title="Start again">${icon('M6 6l12 12M18 6L6 18')}</button>`
+      : (done ? group('safe', 'Next') + group('tension', 'Tension') + group('surprise', 'Surprise')
         : has ? `<button class="btn primary small done-btn" type="button" data-done title="Finished drawing: show where to go next">${icon('M4 12l5 5L20 6')}<span>Done</span></button>` : '')
       + `<span class="tools-gap"></span>`
       + (state.chordProg.length ? `<button class="btn icon act" type="button" data-loop aria-pressed="${!!chord.loop}" aria-label="${chord.loop ? 'Stop' : 'Loop the progression'}" title="${chord.loop ? 'Stop' : 'Loop the progression (metronome tempo)'}">${icon(chord.loop ? 'M6 6h12v12H6z' : 'M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4')}</button>` : '')
@@ -979,8 +1015,10 @@ function renderChord() {
     const playing = chord.loop ? chord.loop.i : -1;
     const steps = state.chordProg.map((c, i) => `<button class="prog-step${playing === i ? ' playing' : ''}" type="button" data-back="${i}" title="Go back to ${c.name}">${c.name}${num(c)}</button>`);
     if (has) steps.push(`<b class="prog-step now${playing === state.chordProg.length ? ' playing' : ''}">${info?.name || '?'}${info?.typeId ? num(info) : ''}</b>`);
-    $('#chord-count').innerHTML = steps.length ? steps.join('<span class="prog-arrow">→</span>') + (sug ? `<span class="prog-arrow">→</span><span class="prog-next">${sug.name}?</span>` : '') : '';
+    // the progression itself is on the stave now
+    $('#chord-count').textContent = looking ? '' : state.chordProg.length ? 'Tap a chord on the stave to see how it\'s played' : '';
     if (!chord.loop) $('#chord-notes').textContent = !has ? 'Tap the neck to draw a chord — one note per string, tap again to remove'
+      : viewing() ? (named ? info.notes.join(' · ') : fretNotes(frets).map((m) => noteName(m, chordPref())).join(' · '))
       : !done ? `${named ? info.notes.join(' · ') + ' — ' : ''}tap Done when the chord's finished`
       : sug ? `${(named ? info.notes.join(' · ') + ' — ' : '')}${sug.name} (${sug.numeral}): ${sug.why}${sug.stay?.length ? ` · ${sug.stay.length} finger${sug.stay.length > 1 ? 's' : ''} stay put` : ''}`
       : $('#chord-notes').textContent;
@@ -996,25 +1034,85 @@ function renderChord() {
   }
 
   $('#chord-card').classList.toggle('long-name', $('#chord-name').textContent.length > 4);
-  // stave: the chord's notes stacked
-  renderChordStave(frets, info);
+  $('#chord-card').classList.toggle('drawing', drawing);
+  // stave: the progression when drawing (tap a chord to see it on the neck), otherwise the one chord
+  if (drawing && !chord.practice && (state.chordProg.length || sug)) renderProgStave(sug);
+  else renderChordStave(frets, info);
+  $('#stave').classList.toggle('chording-stave', drawing && !chord.practice && (state.chordProg.length > 0 || !!sug));
 }
 
-function renderChordStave(frets, info) {
+/** Stave pitches for a chord, and whether they're written an octave down (8va) to stay in the frame. */
+function chordPitchesFramed(frets) {
+  const p = chordPitches(frets);
+  const top = staveFrame().top - 2;
+  if (p.length && Math.max(...p.map((x) => x.octave * 7 + x.letter)) > top) return { pitches: p.map((x) => ({ ...x, octave: x.octave - 1 })), ottava: true };
+  return { pitches: p, ottava: false };
+}
+/** A chord's notes as stave pitches, spelled for that chord. */
+function chordPitches(frets) {
   const midis = [...new Set(fretNotes(frets))].sort((a, b) => a - b);
-  const host = $('#stave');
-  if (!midis.length) { renderStave(host, null, chordPref(), { compact: staveCompact() }); return; }
-  const sp = info?.typeId ? chordSpelling(info.rootPc, info.typeId) : null;
-  const pitches = midis.map((m) => {
+  const id = identifyChord(midis);
+  const sp = id?.typeId ? chordSpelling(id.rootPc, id.typeId) : null;
+  return midis.map((m) => {
     const x = sp?.get(((m % 12) + 12) % 12);
     if (x) return { letter: x.letter, alter: x.acc, midi: m, octave: Math.floor((m + 12 - x.acc - NATURAL_PC[x.letter]) / 12) - 1 };
     const w = spell(m + 12, chordPref());
     return { letter: w.letter, alter: w.acc, midi: m, octave: w.octave };
   });
-  const score = { measures: [{ number: '', key: 0, time: { beats: 4, beatType: 4 }, keyChanged: false, timeChanged: false, beats: 4, length: 4,
+}
+
+/** The progression on the stave: one bar per chord, name above, numeral below; a previewed next chord faded. */
+function renderProgStave(sug) {
+  const host = $('#stave');
+  const info = chordInfo();
+  const key = chord.key || (info?.typeId ? { tonic: info.rootPc, mode: 'major' } : null);
+  const items = [...state.chordProg.map((c) => ({ frets: c.frets, name: c.name, rootPc: c.rootPc, typeId: c.typeId }))];
+  if (state.chordDrawn.some((f) => f >= 0)) items.push({ frets: state.chordDrawn, name: info?.name || '?', rootPc: info?.rootPc, typeId: info?.typeId });
+  const cur = chord.loop ? chord.loop.i : viewing() ? chord.viewIdx : items.length - 1;
+  if (sug?.shape) items.push({ frets: sug.shape.frets, name: sug.name, rootPc: sug.rootPc, typeId: sug.typeId, preview: true });
+  const measures = items.map((it) => { const fp = chordPitchesFramed(it.frets); return {
+    number: '', key: 0, time: { beats: 4, beatType: 4 }, keyChanged: false, timeChanged: false, beats: 4, length: 4, marks: [], ottava: fp.ottava,
+    label: it.name, sub: key && it.typeId ? numeral({ rootPc: it.rootPc, typeId: it.typeId }, key) : '',
+    notes: [{ start: 0, beats: 4, type: 'whole', dots: 0, rest: false, pitches: fp.pitches, beams: {}, tieStart: false, tieStop: false }],
+  }; });
+  const box = host.getBoundingClientRect();
+  // as many chords as fit at the shared stave size (clef ≈ 50 units, each chord ≈ 48)
+  const k = staveScale();
+  const fits = k ? Math.floor((box.width / k - 50) / 48) : 4;
+  const show = Math.min(measures.length, Math.max(2, Math.min(6, fits)));
+  // the latest chords (and the previewed next one) unless you're looking further back
+  const tail = Math.max(0, measures.length - show);
+  const start = cur >= tail ? tail : Math.max(0, cur - 1);
+  chord.staveItems = items;
+  renderScore(host, { measures }, {
+    start, count: show, cur: { m: cur, n: 0 }, next: sug?.shape ? { m: items.length - 1, n: 0 } : null,
+    minWidth: staveScale() ? box.width / staveScale() - 2 : 150, labels: true, frame: staveFrame(), scale: staveScale(), box: staveBox(),
+  });
+}
+// Tap a chord on the stave: see how to play it (or move on to a previewed next chord)
+$('#stave').addEventListener('click', (e) => {
+  if (state.view !== 'chords' || !state.chordDraw || chord.practice || !chord.staveItems) return;
+  const el = e.target.closest('[data-bar], [data-m]');
+  if (!el) return;
+  const i = Number(el.dataset.bar ?? el.dataset.m);
+  const it = chord.staveItems[i];
+  if (!it) return;
+  stopLoop();
+  if (it.preview) { moveTo(chord.suggestions[chord.sel]); chordChanged(); return; }
+  chord.viewIdx = i < state.chordProg.length ? i : null;
+  strum(it.frets, 0.5);
+  renderChord();
+});
+
+function renderChordStave(frets, info) {
+  const midis = [...new Set(fretNotes(frets))].sort((a, b) => a - b);
+  const host = $('#stave');
+  if (!midis.length) { renderStave(host, null, chordPref(), { compact: staveCompact(), scale: staveScale() }); return; }
+  const { pitches, ottava } = chordPitchesFramed(frets);
+  const score = { measures: [{ number: '', key: 0, time: { beats: 4, beatType: 4 }, keyChanged: false, timeChanged: false, beats: 4, length: 4, ottava,
     notes: [{ start: 0, beats: 4, type: 'whole', dots: 0, rest: false, pitches, beams: {}, tieStart: false, tieStop: false }] }] };
   const box = host.getBoundingClientRect();
-  renderScore(host, score, { start: 0, count: 1, minWidth: 150, fit: { w: box.width, h: box.height }, single: true });
+  renderScore(host, score, { start: 0, count: 1, minWidth: 150, single: true, frame: staveFrame(), scale: staveScale(), box: staveBox() });
 }
 
 let lastReadoutKey = '';
@@ -1039,14 +1137,14 @@ function showReadout(midi, frame, stale) {
     $('#note-name').textContent = '—';
     $('#note-oct').textContent = '';
     $('#note-enh').textContent = listener.running ? 'Play a single note' : 'Start listening, or tap the fretboard';
-    renderStave($('#stave'), null, pref, { compact: staveCompact() });
+    renderStave($('#stave'), null, pref, { compact: staveCompact(), scale: staveScale() });
     return;
   }
   $('#note-name').textContent = noteName(midi, pref);
   $('#note-oct').textContent = octaveOf(midi);
   const enh = enharmonic(midi);
   $('#note-enh').textContent = enh.includes('/') ? enh : '';
-  renderStave($('#stave'), midi, pref, { compact: staveCompact() });
+  renderStave($('#stave'), midi, pref, { compact: staveCompact(), scale: staveScale() });
 }
 
 // ---------- metronome ----------
