@@ -30,6 +30,7 @@ const defaults = {
   playWide: false,      // Play: stave across the full width, four bars at a time
   playPart: 0,
   playIndex: 0,
+  playStart: 0,         // Play: the note you chose to start from (↺ goes back here, then to the beginning)
   chordRoot: 0,
   chordType: 'maj',
   chordShape: 0,
@@ -433,6 +434,8 @@ function loadPiece(xml, { name = play.name, keepIndex = false, store = true } = 
   play.events = playEvents(score);
   play.fingering = chooseFingering(play.events, notes, FRETS);
   play.index = keepIndex ? Math.min(state.playIndex, Math.max(0, play.events.length - 1)) : 0;
+  if (!keepIndex) state.playStart = 0;
+  state.playStart = Math.min(state.playStart, Math.max(0, play.events.length - 1));
   play.started = 0;
   if (!keepIndex) play.lastRun = 0;
   play.fw.lastMatched = null;
@@ -490,7 +493,14 @@ $('#play-help-close').addEventListener('click', () => { play.help = false; rende
 $('#play-part').addEventListener('change', (e) => { state.playPart = Number(e.target.value); loadPiece(play.xml); });
 $('#play-wide').addEventListener('click', () => { state.playWide = !state.playWide; save(); renderPlay(); });
 $('#play-mic').addEventListener('click', () => micBtn.click());
-$('#play-restart').addEventListener('click', () => { stopPlayDemo(); play.index = 0; play.started = 0; play.lastRun = 0; play.fw.lastMatched = null; state.playIndex = 0; save(); renderPlay(); });
+// ↺: back to the start point you chose; tap again (or if you're already there) for the start of the piece
+$('#play-restart').addEventListener('click', () => {
+  stopPlayDemo();
+  const to = play.index !== state.playStart ? state.playStart : 0;
+  if (to === 0) state.playStart = 0;
+  play.index = to; play.started = 0; play.lastRun = 0; play.fw.lastMatched = null; play.browse = null;
+  state.playIndex = to; save(); renderPlay();
+});
 $('#play-hear').addEventListener('click', () => playDemo2());
 // Drop a file anywhere on the page
 window.addEventListener('dragover', (e) => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); });
@@ -518,9 +528,9 @@ function playAdvance() {
   if (!play.started) play.started = now;
   play.browse = null; // playing: the stave follows you again
   play.index++;
-  if (play.index >= play.events.length) { // the end: note the time and go round again
+  if (play.index >= play.events.length) { // the end: note the time and go round again (from your start point)
     play.lastRun = now - play.started;
-    play.index = 0;
+    play.index = Math.min(state.playStart, play.events.length - 1);
     play.started = 0;
     const card = $('#play-card');
     card.classList.remove('lap'); void card.offsetWidth; card.classList.add('lap');
@@ -561,6 +571,9 @@ function renderPlay() {
     return;
   }
   const at = fingering[index];
+  const toStart = index !== state.playStart && state.playStart > 0;
+  $('#play-restart').title = toStart ? `Back to your start point (bar ${score.measures[events[state.playStart].m].number})` : 'Back to the start of the piece';
+  $('#play-restart').setAttribute('aria-label', $('#play-restart').title);
   $('#play-label').textContent = play.started ? 'Next' : 'Start';
   $('#play-note').textContent = LETTER_NAMES[t.letter] + ACC_TEXT[t.alter];
   $('#play-oct').textContent = Math.floor((t.midi - t.alter - NATURAL[t.letter]) / 12) - 1;
@@ -648,9 +661,9 @@ $('#section-strip').addEventListener('click', (e) => { const b = e.target.closes
 function startFrom(idx) {
   stopPlayDemo();
   play.index = idx; play.started = 0; play.browse = null; play.fw.lastMatched = null;
-  state.playIndex = idx; save();
-  const ev = play.events[idx];
-  listener.pluck(ev.midi, 0.6);
+  state.playIndex = idx; state.playStart = idx; save();
+  // let you hear it, but not while listening: the mic would take the sound as you playing it and skip on
+  if (!listener.running) listener.pluck(play.events[idx].midi, 0.6);
   renderPlay();
 }
 document.addEventListener('keydown', (e) => {
@@ -967,8 +980,9 @@ function renderChord() {
     const sh = chord.shapes[state.chordShape];
     tools.innerHTML = n ? `<button class="btn icon" type="button" data-shape="-1" aria-label="Previous shape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>`
       + `<span class="shape-num">${state.chordShape + 1} of ${n}</span>`
-      + `<button class="btn icon" type="button" data-shape="1" aria-label="Next shape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>` : '';
-    $('#chord-count').textContent = sh ? (sh.minFret === 0 || sh.frets.includes(0) && sh.minFret <= 3 ? 'Open position' : `${sh.barre ? 'Barre at' : 'Around'} fret ${sh.minFret}`) : 'No shape in this tuning';
+      + `<button class="btn icon" type="button" data-shape="1" aria-label="Next shape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>`
+      + `<span class="shape-where">${sh.minFret === 0 || sh.frets.includes(0) && sh.minFret <= 3 ? 'Open position' : `${sh.barre ? 'Barre at' : 'Around'} fret ${sh.minFret}`}</span>` : '';
+    $('#chord-count').textContent = n ? '' : 'No shape in this tuning';
   }
 
   $('#chord-card').classList.toggle('long-name', $('#chord-name').textContent.length > 4);
