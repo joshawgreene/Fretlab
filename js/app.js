@@ -518,6 +518,7 @@ $('#play-restart').addEventListener('click', () => {
   state.playIndex = to; save(); renderPlay();
 });
 $('#play-hear').addEventListener('click', () => playDemo2());
+$('#play-hear-wide').addEventListener('click', () => playDemo2());
 // Drop a file anywhere on the page
 window.addEventListener('dragover', (e) => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); });
 window.addEventListener('drop', (e) => { if (e.dataTransfer?.files?.length) { e.preventDefault(); importFile(e.dataTransfer.files[0]); } });
@@ -713,14 +714,14 @@ function playDemo2() {
   timers.push(setTimeout(() => { stopPlayDemo(); renderPlay(); }, (when(last) - t0 + last.beats) * beat + 200));
   play.demo = timers;
   play.demoFrom = from;
-  $('#play-hear').setAttribute('aria-pressed', 'true');
+  for (const id of ['#play-hear', '#play-hear-wide']) $(id).setAttribute('aria-pressed', 'true');
 }
 function stopPlayDemo() {
   if (!play.demo) return;
   play.demo.forEach(clearTimeout);
   play.demo = null;
   play.index = play.demoFrom ?? play.index;
-  $('#play-hear').setAttribute('aria-pressed', 'false');
+  for (const id of ['#play-hear', '#play-hear-wide']) $(id).setAttribute('aria-pressed', 'false');
 }
 
 // ---------- Chords: look a chord up, draw one to name it, practise plucking it ----------

@@ -262,8 +262,11 @@ body:not(.wide) #bar-now { padding: 3px 7px; font-size: 12px; margin-left: 4px; 
 .section-strip .sec small { font: 600 10px var(--mono); color: var(--muted); }
 .section-strip .sec.here { background: var(--accent-soft); border-color: var(--accent); }
 .stave-tools .btn.small { gap: 6px; }
-#play-mic { display: none; }
-body.wide #play-mic { display: inline-flex; }
+#play-mic, #play-hear-wide { display: none; }
+body.wide #play-mic, body.wide.has-piece #play-hear-wide { display: inline-flex; }
+#play-hear-wide .stop, #play-hear-wide[aria-pressed="true"] .play { display: none; }
+#play-hear-wide[aria-pressed="true"] .stop { display: inline; }
+#play-hear-wide[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 body.listening #play-mic { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 #play-wide .shrink-icon, body.wide #play-wide .grow-icon { display: none; }
 body.wide #play-wide .shrink-icon { display: block; }
@@ -354,7 +357,7 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
 .sc-note { color: var(--ink); }
 .sc-note.done { color: #b9b9b4; }
 .sc-note.cur { color: var(--accent); }
-.sc-note.next { color: var(--accent); opacity: .3; }
+/* the next note on the stave looks like any other upcoming note — only the one to play now is coloured */
 .sc-cur-band { fill: var(--accent-soft); }
 .sc-head { fill: currentColor; }
 .sc-head.hollow { fill: none; stroke: currentColor; stroke-width: 2; }
