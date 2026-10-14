@@ -124,6 +124,37 @@
         </div>
       </section>
 
+      <section class="mod mod-b learn-card chord-card" id="chord-card" aria-label="Chords">
+        <header class="mod-head learn-head">
+          <details class="picker" id="chord-picker">
+            <summary class="btn small" aria-label="Choose a chord">
+              <svg class="key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14M7 3v18M11 3v18M15 3v18M19 3v18"/></svg>
+              <span id="chord-title">C</span>
+              <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+            <div class="picker-panel">
+              <label class="field"><span>Root</span><select id="chord-root"></select></label>
+              <label class="field"><span>Chord</span><select id="chord-type"></select></label>
+            </div>
+          </details>
+          <button class="btn icon" id="chord-draw" type="button" aria-pressed="false" aria-label="Draw a chord" title="Draw a chord on the neck and get its name">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-5L16 4l4 4L9 19zM14 6l4 4"/></svg></button>
+          <button class="btn icon" id="chord-practice" type="button" aria-pressed="false" aria-label="Practise: pluck the notes" title="Practise: pluck each note, root first">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c4 0 6 3 6 7 0 5-4 11-6 11S6 15 6 10c0-4 2-7 6-7z"/></svg></button>
+          <button class="btn icon" id="chord-hear" type="button" aria-label="Hear it" title="Hear it">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg></button>
+        </header>
+        <div class="learn-body">
+          <p class="label" id="chord-label">Chord</p>
+          <div class="big-note"><span id="chord-name">C</span></div>
+          <p class="learn-where" id="chord-notes"></p>
+        </div>
+        <div class="learn-foot">
+          <div class="progress" id="chord-progress" aria-hidden="true" hidden><span id="chord-bar"></span></div>
+          <div class="chord-tools" id="chord-tools"></div>
+          <p class="learn-count" id="chord-count"></p>
+        </div>
+      </section>
+
       <section class="mod mod-board fb-card" aria-label="Fretboard">
         <div id="fretboard"></div>
       </section>
@@ -180,6 +211,8 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h5v-5h5v-5h5V5h3"/><rect class="fill" x="17" y="2" width="4" height="3"/></svg><span class="sr">Learn</span></button>
         <button role="tab" id="tab-play" aria-controls="view-fretboard" aria-selected="false" type="button" title="Play — a piece of music">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18V4l8 3"/><ellipse class="fill" cx="7.5" cy="18" rx="3.5" ry="2.8"/></svg><span class="sr">Play</span></button>
+        <button role="tab" id="tab-chords" aria-controls="view-fretboard" aria-selected="false" type="button" title="Chords">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16M6 3v18M10 3v18M14 3v18M18 3v18M4 9h16M4 15h16"/><rect class="fill" x="8" y="10.5" width="4" height="3"/><rect class="fill" x="12" y="4.5" width="4" height="3"/><rect class="fill" x="16" y="10.5" width="4" height="3"/></svg><span class="sr">Chords</span></button>
         <button role="tab" id="tab-tuner" aria-controls="view-tuner" aria-selected="false" type="button" title="Tune">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v9a4 4 0 0 0 8 0V2M12 15v7"/></svg><span class="sr">Tune</span></button>
       </div>

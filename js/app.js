@@ -9,6 +9,8 @@ import { consumePluck } from './analysis.js';
 import { readScore, playEvents, fileToXml, ScoreError } from './musicxml.js';
 import { renderScore, barWindow } from './score-stave.js';
 import { chooseFingering } from './fingering.js';
+import { CHORD_TYPES, CHORD_ROOTS, chordType, chordName, chordSpelling, chordShapes, distinctShapes, identifyChord, shapeText, detectKey, numeral, suggestNext, easiestChange } from './chords.js';
+import { spell } from './notes.js';
 
 const $ = (s) => document.querySelector(s);
 const STORE_KEY = 'fretlab:v1';
@@ -28,6 +30,12 @@ const defaults = {
   playWide: false,      // Play: stave across the full width, four bars at a time
   playPart: 0,
   playIndex: 0,
+  chordRoot: 0,
+  chordType: 'maj',
+  chordShape: 0,
+  chordDraw: false,
+  chordDrawn: [-1, -1, -1, -1, -1, -1], // Draw: fret per string, −1 = not played
+  chordProg: [],        // Draw: the chords before the current one [{ rootPc, typeId, name, frets }]
 };
 const PIECE_KEY = 'fretlab:piece'; // the imported MusicXML, kept separately (it can be large)
 const FRETS = 22;
@@ -46,13 +54,14 @@ const currentTuning = () => {
 };
 // Sharps or flats: follow the scale's key in Learn mode, otherwise the tuning.
 const notePref = () => (state.view === 'learn' ? keyPref(state.learnRoot, state.learnScale)
-  : state.view === 'play' && play.score ? (play.score.measures[0].key < 0 ? 'flat' : 'sharp') : currentTuning().pref);
+  : state.view === 'play' && play.score ? (play.score.measures[0].key < 0 ? 'flat' : 'sharp')
+  : state.view === 'chords' ? chordPref() : currentTuning().pref);
 
 const staveCompact = () => window.innerHeight < 760;
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { lastReadoutKey = ''; showReadout(lastMidi, lastFrame, !lastFrame?.active); renderLearn(); renderPlay(); }, 120);
+  resizeTimer = setTimeout(() => { lastReadoutKey = ''; showReadout(lastMidi, lastFrame, !lastFrame?.active); renderLearn(); renderPlay(); renderChord(); }, 120);
 });
 
 // ---------- components ----------
@@ -72,11 +81,12 @@ function applyAll() {
   listener.tracker.minFreq = midiToFreq(Math.min(...notes)) * 0.94; // nothing below the lowest open string
   tuningSelect.value = state.tuningId;
   $('#sens-input').value = state.sensitivity;
-  fretboard.configure({ tuning: notes, frets: FRETS, pref, label: state.view === 'learn' ? learnLabel : null });
+  fretboard.configure({ tuning: notes, frets: FRETS, pref, label: state.view === 'learn' ? learnLabel : state.view === 'chords' ? chordLabel : null });
   tuner.setTuning(notes, pref);
   renderCustomEditor();
   rebuildLearn();
   rebuildPlay();
+  rebuildChord();
   lastReadoutKey = '';
   showReadout(lastMidi, lastFrame, !listener.running || !lastFrame?.active);
   save();
@@ -110,12 +120,12 @@ $('#sens-input').addEventListener('input', (e) => { state.sensitivity = Number(e
 // Tabs. Fretboard and Learn share the fretboard + stave; Learn swaps the note panel for its own.
 function setView(view) {
   const changed = state.view !== view;
-  if (changed) closePanels();
+  if (changed) { closePanels(); stopLoop(); }
   state.view = view;
   document.body.dataset.view = view;
   listener.setTunerMode(view === 'tuner');
   if (view === 'tuner') tuner.update(null, listener.running);
-  for (const v of ['fretboard', 'learn', 'play', 'tuner']) $(`#tab-${v}`).setAttribute('aria-selected', String(v === view));
+  for (const v of ['fretboard', 'learn', 'play', 'chords', 'tuner']) $(`#tab-${v}`).setAttribute('aria-selected', String(v === view));
   $('#view-fretboard').hidden = view === 'tuner';
   $('#view-tuner').hidden = view !== 'tuner';
   if (changed) applyAll(); // note spelling and the fretboard overlay depend on the view
@@ -124,6 +134,7 @@ function setView(view) {
 $('#tab-fretboard').addEventListener('click', () => setView('fretboard'));
 $('#tab-learn').addEventListener('click', () => setView('learn'));
 $('#tab-play').addEventListener('click', () => setView('play'));
+$('#tab-chords').addEventListener('click', () => setView('chords'));
 $('#tab-tuner').addEventListener('click', () => setView('tuner'));
 $('#rotate-tuner').addEventListener('click', () => setView('tuner'));
 
@@ -189,6 +200,7 @@ function onFrame(frame) {
   if (frame.active) { lastMidi = frame.midi; lastFrame = frame; }
   if (state.view === 'learn') learnFrame(frame);
   else if (state.view === 'play') playFrame(frame);
+  else if (state.view === 'chords') chordFrame(frame);
   else if (frame.active) fretboard.show(frame.midi);
   showReadout(lastMidi, frame.active ? frame : lastFrame, !frame.active);
 }
@@ -196,11 +208,13 @@ function onFrame(frame) {
 /** Tap a fretboard position: hear it, and (when not listening) show it / play it in Learn mode. */
 function tapNote(midi, s, f) {
   listener.pluck(midi);
+  if (state.view === 'chords' && state.chordDraw && !chord.practice) { drawTap(s, f); return; }
   if (!listener.running) {
     lastMidi = midi;
     lastFrame = null;
     showReadout(midi, null, false);
     if (state.view === 'play') { playTap(midi, s, f); return; }
+    if (state.view === 'chords') { chordTap(midi, s, f); return; }
     if (state.view !== 'learn') { fretboard.show(midi, { s, f }); return; }
     const t = learn.path[learn.index];
     if (learn.demo || !t) return;
@@ -593,9 +607,290 @@ function stopPlayDemo() {
   $('#play-hear').setAttribute('aria-pressed', 'false');
 }
 
+// ---------- Chords: look a chord up, draw one to name it, practise plucking it ----------
+const chord = { shapes: [], all: [], practice: false, path: [], index: 0, started: 0, lastRun: 0, fw: makeFollower(), sel: 0, trail: [], suggestions: [], demo: null };
+const NATURAL_PC = [0, 2, 4, 5, 7, 9, 11];
+const MINOR_TYPES = ['min', 'm7', 'm6', 'm9', 'dim', 'm7b5', 'dim7'];
+
+$('#chord-root').innerHTML = CHORD_ROOTS.map((r) => `<option value="${r.pc}">${r.label}</option>`).join('');
+$('#chord-type').innerHTML = CHORD_TYPES.map((t) => `<option value="${t.id}">${t.suffix || 'maj'} — ${t.name}</option>`).join('');
+$('#chord-root').addEventListener('change', (e) => { state.chordRoot = Number(e.target.value); state.chordShape = 0; chordChanged(); });
+$('#chord-type').addEventListener('change', (e) => { state.chordType = e.target.value; state.chordShape = 0; chordChanged(); });
+$('#chord-draw').addEventListener('click', () => { state.chordDraw = !state.chordDraw; stopPractice(); chordChanged(); });
+$('#chord-practice').addEventListener('click', () => { stopLoop(); chord.practice ? stopPractice() : startPractice(); renderChord(); });
+$('#chord-hear').addEventListener('click', () => strum(currentFrets()));
+$('#chord-tools').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.shape) { state.chordShape = (state.chordShape + Number(b.dataset.shape) + chord.shapes.length) % chord.shapes.length; chordChanged(); return; }
+  if (b.dataset.next !== undefined) {
+    const i = Number(b.dataset.next);
+    stopLoop();
+    if (chord.sel === i) moveTo(chord.suggestions[i]); // second tap: move on to it
+    else { chord.sel = i; const sg = chord.suggestions[i]; if (sg?.shape) strum(sg.shape.frets, 0.4); } // first tap: preview it
+    chordChanged(); return;
+  }
+  if (b.dataset.undo !== undefined) { stopLoop(); const last = state.chordProg.pop(); if (last) state.chordDrawn = last.frets.slice(); chord.sel = 0; chordChanged(); return; }
+  if (b.dataset.clear !== undefined) { stopLoop(); state.chordDrawn = state.chordDrawn.map(() => -1); state.chordProg = []; chord.sel = 0; chordChanged(); return; }
+  if (b.dataset.loop !== undefined) { chord.loop ? stopLoop() : startLoop(); renderChord(); }
+});
+// Tap an earlier chord in the progression to go back to it
+$('#chord-count').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-back]');
+  if (!b) return;
+  stopLoop();
+  const i = Number(b.dataset.back);
+  state.chordDrawn = state.chordProg[i].frets.slice();
+  state.chordProg = state.chordProg.slice(0, i);
+  chord.sel = 0;
+  chordChanged();
+});
+
+/** Keep the current chord in the progression and move on to a suggested one. */
+function moveTo(sg) {
+  if (!sg?.shape) return;
+  const info = chordInfo();
+  state.chordProg.push({ rootPc: info?.rootPc ?? null, typeId: info?.typeId ?? null, name: info?.name || '?', frets: state.chordDrawn.slice() });
+  state.chordDrawn = sg.shape.frets.slice();
+  chord.sel = 0;
+  strum(state.chordDrawn);
+}
+/** The progression so far, as chords (the current one last); unnamed chords are skipped. */
+function progChords() {
+  const info = chordInfo();
+  return [...state.chordProg, info].filter((c) => c && c.typeId).map((c) => ({ rootPc: c.rootPc, typeId: c.typeId }));
+}
+
+/** Loop the progression, one chord per bar at the metronome's tempo. */
+function startLoop() {
+  const info = chordInfo();
+  const seq = [...state.chordProg, { name: info?.name || '?', frets: state.chordDrawn.slice() }].filter((c) => c.frets.some((f) => f >= 0));
+  if (seq.length < 2) return;
+  chord.loop = { seq, i: 0, timers: [] };
+  const bar = 4 * 60 / state.bpm * 1000;
+  const tick = () => {
+    if (!chord.loop) return;
+    const fr = seq[chord.loop.i].frets;
+    strum(fr);
+    chord.loop.timers = [setTimeout(() => chord.loop && strum(fr, 0.3), bar / 2), setTimeout(() => { if (!chord.loop) return; chord.loop.i = (chord.loop.i + 1) % seq.length; tick(); }, bar)];
+    renderChord();
+  };
+  tick();
+}
+function stopLoop() {
+  if (!chord.loop) return;
+  chord.loop.timers.forEach(clearTimeout);
+  chord.loop = null;
+}
+
+const fretNotes = (frets) => { const t = currentTuning().notes; return frets.map((f, s) => (f < 0 ? null : t[s] + f)).filter((x) => x !== null); };
+function chordInfo() {
+  if (state.chordDraw) return identifyChord(fretNotes(state.chordDrawn));
+  const sp = chordSpelling(state.chordRoot, state.chordType);
+  return { rootPc: state.chordRoot, typeId: state.chordType, name: chordName(state.chordRoot, state.chordType), notes: [...sp.values()].map((x) => x.name) };
+}
+function chordPref() {
+  const info = chordInfo();
+  if (!info?.typeId) return currentTuning().pref;
+  return [...chordSpelling(info.rootPc, info.typeId).values()].some((x) => x.acc < 0) ? 'flat' : 'sharp';
+}
+function chordLabel(midi) {
+  const info = chordInfo();
+  const sp = info?.typeId ? chordSpelling(info.rootPc, info.typeId).get(((midi % 12) + 12) % 12) : null;
+  return sp ? sp.name : noteName(midi, chordPref());
+}
+const currentFrets = () => (state.chordDraw ? (chord.loop ? chord.loop.seq[chord.loop.i].frets : state.chordDrawn) : chord.shapes[state.chordShape]?.frets || []);
+
+function chordChanged() { save(); applyAll(); }
+
+/** Tuning or chord changed: work out the shapes (and, when drawing, where to go next). */
+function rebuildChord() {
+  const { notes } = currentTuning();
+  if (state.chordDrawn.length !== notes.length) state.chordDrawn = notes.map(() => -1);
+  chord.all = chordShapes(notes, state.chordRoot, state.chordType, FRETS);
+  chord.shapes = distinctShapes(chord.all);
+  if (state.chordShape >= chord.shapes.length) state.chordShape = 0;
+  // Draw: work out the key from the progression, then where to go next and the easiest shape to change to
+  chord.suggestions = [];
+  chord.key = null;
+  if (state.chordDraw) {
+    const prog = progChords();
+    chord.key = prog.length ? detectKey(prog) : null;
+    if (chordInfo()?.typeId) {
+      chord.suggestions = suggestNext(prog, chord.key).map((sg) => ({ ...sg, ...easiestChange(chordShapes(notes, sg.rootPc, sg.typeId, FRETS), state.chordDrawn) }));
+    }
+    if (chord.sel >= chord.suggestions.length) chord.sel = 0;
+  }
+  $('#chord-root').value = String(state.chordRoot);
+  $('#chord-type').value = state.chordType;
+  if (chord.practice) buildPracticePath();
+  renderChord();
+}
+
+function drawTap(s, f) {
+  stopLoop();
+  state.chordDrawn[s] = state.chordDrawn[s] === f ? -1 : f; // tap again to take it off
+  chord.sel = 0;
+  chordChanged();
+}
+
+/** Practice: the chord's notes one at a time, from the root upwards (then any strings below it). */
+function buildPracticePath() {
+  const { notes } = currentTuning();
+  const frets = currentFrets();
+  const info = chordInfo();
+  const strings = frets.map((f, s) => (f >= 0 ? { s, f, midi: notes[s] + f } : null)).filter(Boolean).sort((a, b) => a.midi - b.midi);
+  const r = info?.rootPc ?? null;
+  const k = r === null ? 0 : Math.max(0, strings.findIndex((x) => ((x.midi - r) % 12 + 12) % 12 === 0));
+  chord.path = [...strings.slice(k), ...strings.slice(0, k)];
+  if (chord.index >= chord.path.length) chord.index = 0;
+}
+function startPractice() {
+  chord.practice = true; chord.index = 0; chord.started = 0; chord.lastRun = 0; chord.fw.lastMatched = null;
+  buildPracticePath();
+}
+function stopPractice() { chord.practice = false; chord.index = 0; if (state.view === 'chords') listener.tracker.expect = null; }
+
+function chordFrame(frame) {
+  if (!chord.practice) { fretboard.show(frame.active ? frame.midi : null); return; } // just show what's heard
+  const t = chord.path[chord.index];
+  if (!t) return;
+  if (followFrame(chord.fw, frame, t.midi)) chordAdvance();
+  fretboard.show(wrongNote(chord.fw, frame, chord.path[chord.index]?.midi));
+}
+function chordTap(midi, s, f) {
+  if (!chord.practice) { fretboard.show(midi, { s, f }); return; }
+  const t = chord.path[chord.index];
+  if (t && midi === t.midi) { fretboard.show(null); chordAdvance(); } else fretboard.show(midi, { s, f });
+}
+function chordAdvance() {
+  const now = performance.now();
+  const t = chord.path[chord.index];
+  fretboard.flash(t.s, t.f);
+  fretboard.show(null);
+  chord.fw.lastMatched = t.midi;
+  if (!chord.started) chord.started = now;
+  chord.index++;
+  if (chord.index >= chord.path.length) {
+    chord.lastRun = now - chord.started; chord.started = 0; chord.index = 0;
+    const card = $('#chord-card');
+    card.classList.remove('lap'); void card.offsetWidth; card.classList.add('lap');
+  }
+  renderChord();
+}
+
+function strum(frets, volume = 0.55) {
+  const { notes } = currentTuning();
+  frets.forEach((f, s) => { if (f >= 0) setTimeout(() => listener.pluck(notes[s] + f, volume), s * 45); });
+}
+
+function renderChord() {
+  const active = state.view === 'chords';
+  if (!active) { fretboard.setChord(null); return; }
+  const info = chordInfo();
+  const frets = currentFrets();
+  const has = frets.some((f) => f >= 0);
+  const drawing = state.chordDraw;
+  $('#chord-draw').setAttribute('aria-pressed', String(drawing));
+  $('#chord-practice').setAttribute('aria-pressed', String(chord.practice));
+  $('#chord-practice').disabled = !has;
+  $('#chord-picker').classList.toggle('disabled', drawing);
+  $('#chord-title').textContent = drawing ? 'Draw a chord' : chordName(state.chordRoot, state.chordType);
+  if (drawing) $('#chord-picker').open = false;
+
+  // fretboard
+  let ghosts = [], stay = [];
+  const sug = drawing && !chord.loop ? chord.suggestions[chord.sel] : null;
+  if (!chord.practice) {
+    if (drawing) { if (sug?.shape) { ghosts = sug.shape.frets.map((f, s) => (f >= 0 ? { s, f } : null)).filter(Boolean); stay = sug.stay; } }
+    else chord.shapes.forEach((sh, i) => { if (i !== state.chordShape) sh.frets.forEach((f, s) => { if (f >= 0) ghosts.push({ s, f }); }); });
+  }
+  const target = chord.practice ? chord.path[chord.index] : null;
+  listener.tracker.expect = target ? midiToFreq(target.midi) : null;
+  const shownInfo = chord.loop ? identifyChord(fretNotes(frets)) : info;
+  fretboard.setChord({ main: has ? frets : null, rootPc: shownInfo?.rootPc ?? -1, ghosts, stay, target, done: chord.practice ? chord.path.slice(0, chord.index) : [] });
+
+  // card
+  const named = info?.name;
+  $('#chord-name').textContent = has || !drawing ? (named || '?') : '—';
+  $('#chord-notes').textContent = !has && drawing ? 'Tap the neck to draw a chord — one note per string, tap again to remove'
+    : named ? `${info.notes.join(' · ')}${drawing ? '' : ` · ${chordType(state.chordType).name}`}`
+    : `${fretNotes(frets).map((m) => noteName(m, chordPref())).join(' · ')} — no common chord name`;
+  const tools = $('#chord-tools');
+  $('#chord-progress').hidden = !chord.practice;
+  if (chord.practice) {
+    const t = chord.path[chord.index];
+    $('#chord-label').textContent = `${chord.started ? 'Next' : 'Pluck'}${chord.index === 0 && info?.rootPc !== null ? ' · root' : ''}`;
+    $('#chord-notes').textContent = t ? `${chordLabel(t.midi)} · ${t.f === 0 ? 'open' : `fret ${t.f}`} · string ${6 - t.s}` : '';
+    $('#chord-bar').style.transform = `scaleX(${chord.path.length ? chord.index / chord.path.length : 0})`;
+    const secs = chord.lastRun ? (chord.lastRun / 1000).toFixed(1) : '';
+    $('#chord-count').textContent = `${chord.index + 1} of ${chord.path.length}${secs ? ` · last ${secs}s — then strum it` : ''}`;
+    tools.innerHTML = '';
+  } else if (drawing) {
+    const key = chord.key;
+    const showing = chord.loop ? shownInfo : info; // while looping: the chord being played
+    const cur = showing?.typeId ? numeral(showing, key || { tonic: showing.rootPc, mode: 'major' }) : '';
+    $('#chord-label').textContent = !has ? 'Draw' : key && showing?.typeId ? `${key.name}${key.sure ? '' : ' ?'} · ${cur}` : 'You drew';
+    if (chord.loop) {
+      $('#chord-name').textContent = chord.loop.seq[chord.loop.i].name;
+      $('#chord-notes').textContent = showing?.notes ? `${showing.notes.join(' · ')} — playing bar ${chord.loop.i + 1} of ${chord.loop.seq.length}` : '';
+    }
+    const group = (g, label) => {
+      const items = chord.suggestions.map((x, i) => ({ x, i })).filter(({ x }) => x.group === g);
+      return items.length ? `<span class="chip-label">${label}</span>` + items.map(({ x, i }) =>
+        `<button class="chip ${g}" type="button" data-next="${i}" aria-pressed="${i === chord.sel}" title="${x.numeral} — ${x.why}${i === chord.sel ? ' · tap again to use it' : ''}">${x.name}</button>`).join('') : '';
+    };
+    const icon = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+    tools.innerHTML = group('safe', 'Next') + group('tension', 'Tension') + group('surprise', 'Surprise')
+      + `<span class="tools-gap"></span>`
+      + (state.chordProg.length ? `<button class="btn icon" type="button" data-loop aria-pressed="${!!chord.loop}" aria-label="${chord.loop ? 'Stop' : 'Loop the progression'}" title="${chord.loop ? 'Stop' : 'Loop the progression (metronome tempo)'}">${icon(chord.loop ? 'M6 6h12v12H6z' : 'M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4')}</button>` : '')
+      + (state.chordProg.length ? `<button class="btn icon" type="button" data-undo aria-label="Back one chord" title="Back one chord">${icon('M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3')}</button>` : '')
+      + (has || state.chordProg.length ? `<button class="btn icon" type="button" data-clear aria-label="Clear" title="Start again">${icon('M6 6l12 12M18 6L6 18')}</button>` : '');
+    // the progression, with roman numerals; tap an earlier chord to go back to it
+    const k = key || (info?.typeId ? { tonic: info.rootPc, mode: 'major' } : null);
+    const num = (c) => (k && c.typeId ? `<sub>${numeral(c, k)}</sub>` : '');
+    const playing = chord.loop ? chord.loop.i : -1;
+    const steps = state.chordProg.map((c, i) => `<button class="prog-step${playing === i ? ' playing' : ''}" type="button" data-back="${i}" title="Go back to ${c.name}">${c.name}${num(c)}</button>`);
+    if (has) steps.push(`<b class="prog-step now${playing === state.chordProg.length ? ' playing' : ''}">${info?.name || '?'}${info?.typeId ? num(info) : ''}</b>`);
+    $('#chord-count').innerHTML = steps.length ? steps.join('<span class="prog-arrow">→</span>') + (sug ? `<span class="prog-arrow">→</span><span class="prog-next">${sug.name}?</span>` : '') : '';
+    if (!chord.loop) $('#chord-notes').textContent = !has ? 'Tap the neck to draw a chord — one note per string, tap again to remove'
+      : sug ? `${(named ? info.notes.join(' · ') + ' — ' : '')}${sug.name} (${sug.numeral}): ${sug.why}${sug.stay?.length ? ` · ${sug.stay.length} finger${sug.stay.length > 1 ? 's' : ''} stay put` : ''}`
+      : $('#chord-notes').textContent;
+  } else {
+    $('#chord-label').textContent = 'Chord';
+    const n = chord.shapes.length;
+    const sh = chord.shapes[state.chordShape];
+    tools.innerHTML = n ? `<button class="btn icon" type="button" data-shape="-1" aria-label="Previous shape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>`
+      + `<span class="shape-num">${state.chordShape + 1} of ${n}</span>`
+      + `<button class="btn icon" type="button" data-shape="1" aria-label="Next shape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>`
+      + `<span class="shape-text">${shapeText(sh.frets)}</span>` : '';
+    $('#chord-count').textContent = sh ? (sh.minFret === 0 || sh.frets.includes(0) && sh.minFret <= 3 ? 'Open position' : `${sh.barre ? 'Barre at' : 'Around'} fret ${sh.minFret}`) : 'No shape in this tuning';
+  }
+
+  // stave: the chord's notes stacked
+  renderChordStave(frets, info);
+}
+
+function renderChordStave(frets, info) {
+  const midis = [...new Set(fretNotes(frets))].sort((a, b) => a - b);
+  const host = $('#stave');
+  if (!midis.length) { renderStave(host, null, chordPref(), { compact: staveCompact() }); return; }
+  const sp = info?.typeId ? chordSpelling(info.rootPc, info.typeId) : null;
+  const pitches = midis.map((m) => {
+    const x = sp?.get(((m % 12) + 12) % 12);
+    if (x) return { letter: x.letter, alter: x.acc, midi: m, octave: Math.floor((m + 12 - x.acc - NATURAL_PC[x.letter]) / 12) - 1 };
+    const w = spell(m + 12, chordPref());
+    return { letter: w.letter, alter: w.acc, midi: m, octave: w.octave };
+  });
+  const score = { measures: [{ number: '', key: 0, time: { beats: 4, beatType: 4 }, keyChanged: false, timeChanged: false, beats: 4, length: 4,
+    notes: [{ start: 0, beats: 4, type: 'whole', dots: 0, rest: false, pitches, beams: {}, tieStart: false, tieStop: false }] }] };
+  const box = host.getBoundingClientRect();
+  renderScore(host, score, { start: 0, count: 1, minWidth: 150, fit: { w: box.width, h: box.height }, single: true });
+}
+
 let lastReadoutKey = '';
 function showReadout(midi, frame, stale) {
-  if (state.view === 'learn' || state.view === 'play') { fretboard.svg?.classList.toggle('stale', stale); return; }
+  if (state.view === 'learn' || state.view === 'play' || state.view === 'chords') { fretboard.svg?.classList.toggle('stale', stale); return; }
   const pref = notePref();
   $('#note-card').classList.toggle('stale', stale && midi !== null);
   fretboard.svg?.classList.toggle('stale', stale);

@@ -37,7 +37,7 @@ export function barWindow(score, m, wide) {
  * @param {{start:number, count:number, cur?:{m,n}|null, next?:{m,n}|null, minWidth?:number, fit?:{w:number,h:number}}} view
  *   fit: the box it's drawn in — the bars are spread to match its shape, so the stave fills it
  */
-export function renderScore(host, score, { start, count, cur = null, next = null, minWidth = 230, fit = null }) {
+export function renderScore(host, score, { start, count, cur = null, next = null, minWidth = 230, fit = null, single = false }) {
   const range = scoreRange(score);
   const pad = 8;
   const y = (s) => pad + (range.top - s) * STEP;
@@ -108,13 +108,13 @@ export function renderScore(host, score, { start, count, cur = null, next = null
           <circle class="st-clef-ball" cx="5.2" cy="54" r="4"/><text class="st-eight" x="16" y="70">8</text></g>`;
   svg += keySignature(keySig, head.keyX, y);
   if (showTime) svg += timeSignature(first.time, head.timeX, y);
-  if (bars[0]) svg += `<text class="sc-barnum" x="${bars[0].x0 + 2}" y="${y(38) - 9}">${first.number}</text>`;
+  if (bars[0] && !single) svg += `<text class="sc-barnum" x="${bars[0].x0 + 2}" y="${y(38) - 9}">${first.number}</text>`;
 
   for (const bar of bars) {
     if (bar.keyAt !== undefined) svg += keySignature(bar.m.key, bar.x0 + bar.keyAt * stretch, y);
     if (bar.timeAt !== undefined) svg += timeSignature(bar.m.time, bar.x0 + bar.timeAt * stretch, y);
     const last = bar.b === score.measures.length - 1;
-    if (last) svg += `<line class="st-line" x1="${bar.x1 - 7}" x2="${bar.x1 - 7}" y1="${y(38)}" y2="${y(30)}"/>`
+    if (single) { /* a lone chord: no barlines */ } else if (last) svg += `<line class="st-line" x1="${bar.x1 - 7}" x2="${bar.x1 - 7}" y1="${y(38)}" y2="${y(30)}"/>`
       + `<rect class="sc-final" x="${bar.x1 - 4}" y="${y(38)}" width="4" height="${y(30) - y(38)}"/>`;
     else svg += `<line class="st-line" x1="${bar.x1}" x2="${bar.x1}" y1="${y(38)}" y2="${y(30)}"/>`;
 

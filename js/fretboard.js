@@ -63,6 +63,18 @@ export class Fretboard {
     this.paint();
   }
 
+  /**
+   * Chord mode overlay, or null: { main: frets per string (−1 = muted) | null, rootPc, ghosts: [{s,f}],
+   * target: {s,f} | null, done: [{s,f}] }. The main shape is solid, ghosts faded, muted strings get an ×.
+   */
+  setChord(chord) {
+    const was = !!this.chord;
+    this.chord = chord;
+    if (chord) this.trail = [];
+    if (chord && !was) this.hitAt = null;
+    this.paint();
+  }
+
   /** Brief "got it" flash on a position. */
   flash(s, f) {
     const p = this.positions?.find((q) => q.s === s && q.f === f);
@@ -153,6 +165,7 @@ export class Fretboard {
         const g = el('g', { class: f === 0 ? 'pos open' : 'pos', transform: `translate(${cx.toFixed(1)} ${this.stringY(s).toFixed(1)})` }, svg);
         el('rect', { x: -size / 2, y: -size / 2, width: size, height: size }, g);
         el('text', { dy: '0.36em' }, g).textContent = this.label ? this.label(midi) : noteName(midi, this.pref);
+        if (f === 0) el('text', { dy: '0.36em', class: 'mute-x' }, g).textContent = '×'; // a string left out of a chord
         g.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onTap?.(midi, s, f); });
         this.positions.push({ s, f, midi, g });
       }
@@ -180,7 +193,10 @@ export class Fretboard {
   /** In Learn mode: where on the neck this pitch most likely is, given the note we're waiting for. */
   nearestToTarget(midi) {
     const L = this.learn;
-    const t = this.play ? this.play.target : L && L.path[Math.min(L.index, L.path.length - 1)];
+    const C = this.chord;
+    const t = this.play ? this.play.target
+      : C ? C.target || (C.main && C.main.some((f) => f >= 0) ? { s: C.main.findIndex((f) => f >= 0), f: Math.max(0, C.main.find((f) => f >= 0)) } : null)
+      : L && L.path[Math.min(L.index, L.path.length - 1)];
     if (!t || midi === null) return null;
     let best = null, bestCost = Infinity;
     for (const p of this.positions || []) {
@@ -217,14 +233,25 @@ export class Fretboard {
     const segStart = L && L.index > top ? top : 0;
     const doneSet = new Set(L ? L.path.slice(segStart, L.index).map((n) => key(n.s, n.f)) : []);
     const P = this.play;
-    const single = !!L || !!P; // Learn and Play light one square for the note played, not every place it lives
+    const C = this.chord;
+    const single = !!L || !!P || !!C; // Learn, Play and Chords light one square for the note played, not every place it lives
+    const at = (list, p) => !!list && list.some((q) => q.s === p.s && q.f === p.f);
     this.svg?.classList.toggle('learning', !!L);
     this.svg?.classList.toggle('playing', !!P);
+    this.svg?.classList.toggle('chording', !!C);
     for (const p of this.positions) {
       const age = this.trail.indexOf(p.midi);
       const isHit = p.midi === this.current && (!single || (!!this.hitAt && this.hitAt.s === p.s && this.hitAt.f === p.f));
       p.g.classList.toggle('hit', isHit);
       p.g.classList.toggle('trail', !single && p.midi !== this.current && age !== -1);
+      const inMain = !!C?.main && C.main[p.s] === p.f;
+      p.g.classList.toggle('chord-main', inMain);
+      p.g.classList.toggle('chord-root', inMain && ((p.midi - C.rootPc) % 12 + 12) % 12 === 0);
+      p.g.classList.toggle('chord-stay', inMain && at(C?.stay, p));
+      p.g.classList.toggle('chord-ghost', !inMain && at(C?.ghosts, p));
+      p.g.classList.toggle('chord-mute', !!C?.main && p.f === 0 && C.main[p.s] < 0 && C.main.some((f) => f >= 0));
+      p.g.classList.toggle('chord-target', !!C?.target && C.target.s === p.s && C.target.f === p.f);
+      p.g.classList.toggle('chord-done', at(C?.done, p));
       p.g.classList.toggle('play-target', !!P?.target && P.target.s === p.s && P.target.f === p.f);
       p.g.classList.toggle('play-next', !!P?.next && P.next.s === p.s && P.next.f === p.f && !(P.target && P.target.s === p.s && P.target.f === p.f));
       if (age !== -1) p.g.style.setProperty('--age', age);

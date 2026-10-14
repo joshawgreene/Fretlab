@@ -2,11 +2,12 @@
 
 Guitar practice in the browser.
 
-Each mode has its own colour: Frets blue, Learn orange, Play green, Tune black and white.
+Each mode has its own colour: Frets blue, Learn orange, Play green, Chords purple, Tune black and white.
 
 - **Fretboard** — play a note and see every place it lives on the neck, plus the note on a stave.
 - **Learn** — pick a key, scale and position (pentatonic boxes, three-notes-per-string shapes); the scale lights up orange and you play through it, up and back down, round and round with the time of your last run. Options: *Auto position* (move to the next position after each run) and *Arpeggio* (just the root, 3rd and 5th). A blue marker appears only when you hold a wrong note.
 - **Play** — import a piece as MusicXML (`.musicxml`, `.mxl`, `.xml`) and play through it note by note: the stave shows one bar (or four, full width) with the next note in green; the fretboard shows where to play it and ghosts the note after. Fretlab picks the fingering, follows the top line of chords, and ignores repeats for now. Got a PDF or photo? Scan it to MusicXML first (MuseScore's PDF import, Audiveris, PlayScore 2). A sample piece (Ode to Joy) is in `samples/`.
+- **Chords** — pick a chord (18 types, any root) to see how to play it: the main shape in purple, other places on the neck faded; step through the shapes. Or draw a chord by tapping the neck to get its name (slash chords too) and build a progression: Fretlab works out the key you're in from the chords so far, labels each with its roman numeral, and suggests where to go next — safe moves in the key (ranked by how often songs make them), a tension chord (the V7 of where you're heading) and a surprise (borrowed from the parallel key). The next chord's shape is the easiest change, with fingers that can stay put marked. Tap a suggestion to preview it, again to move to it; tap an earlier chord to go back; loop the progression at the metronome's tempo. *Practise* has you pluck the chord's notes one by one, root first. Shapes are worked out for any tuning.
 - **Tuner** — standard, alternate and custom tunings, with a live pitch trace.
 - **Metronome** — always on screen; accented downbeat, unpitched click so the note detector ignores it.
 
@@ -35,6 +36,7 @@ node tests/lowstrings.test.mjs  # low notes as a laptop/phone mic hears them: we
 node tests/fluid.test.mjs   # fast low-string riffs, ringing strings, hammer-ons: how quickly each new note shows
 node tests/scales.test.mjs  # Learn mode: every scale's notes and spelling, the standard position shapes, all 936 positions playable, arpeggios
 node tests/learn.test.mjs   # Learn mode at 80–160 BPM: how fast each step ticks off, nothing missed, no stray blue marker
+node tests/chords.test.mjs  # Chords: shapes match the chord charts, all shapes valid and playable, naming drawn chords, next-chord ideas
 node tests/play.test.mjs    # Play mode: reading MusicXML/.mxl, fingering, repeated notes at tempo, held notes (with vibrato) counted once
 ```
 
@@ -54,6 +56,7 @@ node tests/play.test.mjs    # Play mode: reading MusicXML/.mxl, fingering, repea
 | `js/musicxml.js` | Play mode: reads MusicXML (plain or zipped .mxl, no dependencies) into bars of notes in guitar terms |
 | `js/score-stave.js` | Play mode: draws one or four bars — clef, key/time signatures, notes, beams, ties, rests |
 | `js/fingering.js` | Play mode: picks a string and fret for every note, keeping the hand in one place as long as it can |
+| `js/chords.js` | Chords: types and spelling, playable shapes for any tuning, naming a chord from its notes, next-chord suggestions |
 | `js/metronome.js` | Metronome scheduled on the audio clock, accented downbeat |
 | `js/app.js` | Wires it all together; settings persist in localStorage |
 
