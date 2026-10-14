@@ -288,6 +288,11 @@ body[data-view="play"].has-piece .stave-mod #stave { cursor: default; }
 
 /* Chords: the shape solid purple (root darker), other shapes / the next chord faded, × for strings left out */
 #chord-card .big-note { color: var(--accent); font-size: clamp(40px, 11vh, 110px); }
+.chord-strum { cursor: pointer; user-select: none; -webkit-user-select: none; width: fit-content; }
+@media (hover: hover) { .chord-strum:hover { opacity: .85; } }
+.chord-strum:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.chord-strum.strummed { animation: strummed .35s ease-out; }
+@keyframes strummed { 0% { transform: scale(1.06); } 100% { transform: scale(1); } }
 #chord-card.long-name .big-note { font-size: clamp(30px, 7.5vh, 76px); }
 #chord-card .progress span { background: var(--accent); }
 .mute-x { opacity: 0; fill: var(--ink); font: 900 calc(var(--fb-font, 11px) * 2.1) var(--display); text-anchor: middle; pointer-events: none; }

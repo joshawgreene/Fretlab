@@ -730,6 +730,16 @@ $('#chord-practice').addEventListener('click', () => {
   renderChord();
 });
 $('#chord-hear').addEventListener('click', () => strum(currentFrets()));
+// Tap the big chord name to hear the chord (the one you've drawn, or the shape you're on)
+function strumShown() {
+  const fr = currentFrets();
+  if (!fr.some((f) => f >= 0)) return;
+  strum(fr);
+  const el = $('#chord-strum');
+  el.classList.remove('strummed'); void el.offsetWidth; el.classList.add('strummed');
+}
+$('#chord-strum').addEventListener('click', strumShown);
+$('#chord-strum').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); strumShown(); } });
 $('#chord-tools').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b) return;
