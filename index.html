@@ -74,16 +74,13 @@
       <section class="mod mod-b learn-card" id="learn-card" aria-label="Learn">
         <header class="mod-head learn-head">
           <details class="picker" id="learn-picker">
-            <summary class="btn small" aria-label="Choose key, scale and position">
+            <summary class="btn small" aria-label="Choose key and scale">
               <svg class="key-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="12" r="4"/><path d="M11.5 12H21M17 12v3.5M20 12v2.5"/></svg>
               <span id="learn-title">C major</span>
               <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
             <div class="picker-panel">
               <label class="field"><span>Key</span><select id="learn-root"></select></label>
               <label class="field"><span>Scale</span><select id="learn-scale"></select></label>
-              <label class="field"><span>Position</span><select id="learn-position"></select></label>
-              <label class="toggle"><input type="checkbox" id="learn-auto" /><span class="switch" aria-hidden="true"></span>
-                <span class="toggle-text">Auto position<small>Move to the next position after each run</small></span></label>
               <label class="toggle"><input type="checkbox" id="learn-arp" /><span class="switch" aria-hidden="true"></span>
                 <span class="toggle-text">Arpeggio<small>Just the root, 3rd and 5th</small></span></label>
             </div>
@@ -100,6 +97,13 @@
         </div>
         <div class="learn-foot">
           <div class="progress" aria-hidden="true"><span id="learn-bar"></span></div>
+          <div class="chord-tools learn-tools" id="learn-tools">
+            <button class="btn icon" type="button" data-pos="-1" aria-label="Previous position" title="Previous position"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+            <span class="shape-num" id="learn-pos-num"></span>
+            <button class="btn icon" type="button" data-pos="1" aria-label="Next position" title="Next position"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+            <button class="btn small" id="learn-auto" type="button" aria-pressed="false" title="Move to the next position after each run">Auto</button>
+            <span class="shape-where" id="learn-pos-where"></span>
+          </div>
           <p class="learn-count" id="learn-count"></p>
         </div>
       </section>
