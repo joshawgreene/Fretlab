@@ -318,6 +318,9 @@ body[data-view="play"].has-piece .stave-mod #stave { cursor: default; }
 .chord-tools .btn svg { width: 15px; height: 15px; }
 .chord-tools .shape-num { font: 700 12px var(--mono); color: var(--muted); min-width: 4.5em; text-align: center; }
 .chord-tools .shape-where { margin-left: auto; padding-left: 14px; font: 800 13px var(--display); font-stretch: 105%; color: var(--ink); white-space: nowrap; }
+.learn-tools { margin-top: 8px; }
+.learn-tools #learn-auto { margin-left: 4px; }
+.learn-tools #learn-auto[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .chord-tools .shape-text { font: 700 13px var(--mono); margin-left: auto; letter-spacing: .04em; }
 .chip { border: 2px solid var(--accent); background: var(--surface); color: var(--accent); font-weight: 800; padding: 4px 9px; cursor: pointer; font-size: 14px; }
 .chip[aria-pressed="true"] { background: var(--accent-ghost); color: #2e0f6b; border-color: var(--accent); }
@@ -550,8 +553,8 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   /* Learn readout, same shape as the note readout: target note left, details stacked right */
   .learn-card {
     display: grid; grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: auto 1fr auto auto auto 1fr auto;
-    grid-template-areas: "head head" "note ." "note label" "note where" "note count" "note ." "bar bar";
+    grid-template-rows: auto 1fr auto auto auto 1fr auto auto;
+    grid-template-areas: "head head" "note ." "note label" "note where" "note count" "note ." "bar bar" "tools tools";
     column-gap: 14px; align-items: center;
   }
   .learn-body, .learn-foot { display: contents; }
@@ -562,6 +565,8 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .learn-count { grid-area: count; margin: 3px 0 0; font-size: 11px; }
   .learn-card .progress { grid-area: bar; margin-top: 6px; height: 6px; }
   .chord-tools { grid-area: bar; margin-top: 4px; min-height: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  #learn-tools { grid-area: tools; margin-top: 6px; }
+  #learn-tools #learn-auto { padding: 3px 8px; font-size: 12px; }
   /* chord card: name left, label + notes right, then the progression and the tools — nothing spills out */
   #chord-card { grid-template-columns: minmax(0, max-content) minmax(0, 1fr); grid-template-rows: auto auto 1fr auto auto;
     grid-template-areas: "head head" "label label" "note where" "count count" "bar bar"; row-gap: 2px; }
@@ -612,6 +617,8 @@ body[data-view="learn"] .st-note ellipse:not(.st-hole) { fill: var(--scale); }
   .stave-tools .btn svg { width: 15px; height: 15px; }
 }
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 720px) {
+  #learn-tools .fr-word { display: none; }
+  #learn-tools { gap: 3px; }
   .app { --metro-w: 96px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) var(--metro-w) 156px; }
   .metro-bpm span { font-size: 28px; }
   .metro-row .btn svg { width: 13px; height: 13px; }

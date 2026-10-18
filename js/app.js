@@ -291,8 +291,16 @@ $('#learn-scale').innerHTML = SCALES.map((sc) => `<option value="${sc.id}">${sc.
 // A new key or scale starts again from Position 1.
 $('#learn-root').addEventListener('change', (e) => { state.learnRoot = Number(e.target.value); state.learnPosition = 'pos-1'; applyAll(); });
 $('#learn-scale').addEventListener('change', (e) => { state.learnScale = e.target.value; state.learnPosition = 'pos-1'; applyAll(); });
-$('#learn-position').addEventListener('change', (e) => { state.learnPosition = e.target.value; applyAll(); });
-$('#learn-auto').addEventListener('change', (e) => { state.learnAuto = e.target.checked; save(); renderLearn(); });
+$('#learn-tools').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-pos]');
+  if (!b) return;
+  const pos = learn.positions || [];
+  if (!pos.length) return;
+  const i = Math.max(0, pos.findIndex((p) => p.id === state.learnPosition));
+  state.learnPosition = pos[(i + Number(b.dataset.pos) + pos.length) % pos.length].id;
+  applyAll();
+});
+$('#learn-auto').addEventListener('click', () => { state.learnAuto = !state.learnAuto; save(); renderLearn(); });
 $('#learn-arp').addEventListener('change', (e) => { state.learnArpeggio = e.target.checked; applyAll(); });
 $('#learn-restart').addEventListener('click', () => { restartLearn(); renderLearn(); });
 $('#learn-hear').addEventListener('click', () => playDemo());
@@ -303,11 +311,9 @@ function rebuildLearn() {
   const frets = FRETS;
   const pos = positions(notes, state.learnRoot, state.learnScale, frets);
   if (!pos.some((p) => p.id === state.learnPosition)) state.learnPosition = pos[0]?.id ?? 'pos-1';
-  $('#learn-position').innerHTML = pos.map((p) => `<option value="${p.id}">${p.label}</option>`).join('');
+  learn.positions = pos;
   $('#learn-root').value = String(state.learnRoot);
   $('#learn-scale').value = state.learnScale;
-  $('#learn-position').value = state.learnPosition;
-  $('#learn-auto').checked = state.learnAuto;
   $('#learn-arp').checked = state.learnArpeggio;
   const path = buildPath(notes, { rootPc: state.learnRoot, scaleId: state.learnScale, positionId: state.learnPosition, frets,
     direction: 'updown', arpeggio: state.learnArpeggio });
@@ -380,6 +386,14 @@ function renderLearn() {
   const pref = keyPref(state.learnRoot, state.learnScale);
   const name = scaleById(state.learnScale).name.toLowerCase();
   $('#learn-title').textContent = `${rootName(state.learnRoot, state.learnScale)} ${name}${state.learnArpeggio ? ' arpeggio' : ''}`;
+  // position arrows, like the chord shapes
+  const pos = learn.positions || [];
+  const pi = pos.findIndex((p) => p.id === state.learnPosition);
+  $('#learn-pos-num').textContent = pos.length ? `${pi + 1}/${pos.length}` : '';
+  const fs = pi >= 0 ? pos[pi].path.map((n) => n.f) : [];
+  $('#learn-pos-where').innerHTML = fs.length ? `<span class="fr-word">Frets </span>${Math.min(...fs)}–${Math.max(...fs)}` : '';
+  $('#learn-tools').querySelectorAll('[data-pos]').forEach((b) => { b.disabled = pos.length < 2; });
+  $('#learn-auto').setAttribute('aria-pressed', String(state.learnAuto));
   const total = learn.path.length;
   $('#learn-bar').style.transform = `scaleX(${total ? learn.index / total : 0})`;
   if (!t) {
@@ -395,8 +409,7 @@ function renderLearn() {
   $('#learn-where').textContent = `${t.f === 0 ? 'open' : `fret ${t.f}`} · string ${6 - t.s}`;
   const secs = Math.max(1, Math.round(learn.lastRun / 1000));
   const lastRun = learn.lastRun ? ` · last ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '';
-  const posNum = state.learnAuto ? `Pos ${state.learnPosition.replace('pos-', '')} · ` : '';
-  $('#learn-count').textContent = `${posNum}${learn.index + 1} of ${total}${lastRun}`;
+  $('#learn-count').textContent = `${learn.index + 1} of ${total}${lastRun}`;
   renderStave($('#stave'), t.midi, pref, { compact: staveCompact(), spelled: sp, scale: staveScale() });
 }
 
