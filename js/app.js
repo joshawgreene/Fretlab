@@ -11,6 +11,7 @@ import { renderScore, barWindow } from './score-stave.js';
 import { chooseFingering } from './fingering.js';
 import { CHORD_TYPES, CHORD_ROOTS, chordType, chordName, chordSpelling, chordShapes, distinctShapes, identifyChord, detectKey, numeral, suggestNext, easiestChange } from './chords.js';
 import { spell } from './notes.js';
+import { drawChordSheet, saveJpeg } from './chord-sheet.js';
 
 const $ = (s) => document.querySelector(s);
 const STORE_KEY = 'fretlab:v1';
@@ -792,6 +793,7 @@ $('#chord-tools').addEventListener('click', (e) => {
     state.chordDone = true; chord.viewIdx = null; chord.sel = 0; chordChanged(); return;
   }
   if (b.dataset.clear !== undefined) { chord.viewIdx = null; stopLoop(); state.chordDrawn = state.chordDrawn.map(() => -1); state.chordProg = []; state.chordDone = false; chord.sel = 0; chordChanged(); return; }
+  if (b.dataset.export !== undefined) { exportProgression(); return; }
   if (b.dataset.loop !== undefined) { chord.viewIdx = null; chord.loop ? stopLoop() : startLoop(); renderChord(); }
 });
 // Tap an earlier chord in the progression to go back to it
@@ -822,6 +824,24 @@ function moveTo(sg) {
 function progChords() {
   const info = chordInfo();
   return [...state.chordProg, info].filter((c) => c && c.typeId).map((c) => ({ rootPc: c.rootPc, typeId: c.typeId }));
+}
+
+/** Save the progression (every chord so far plus the one you're on) as one JPEG of chord diagrams. */
+async function exportProgression() {
+  const info = chordInfo();
+  const seq = [...state.chordProg, { name: info?.name || '?', frets: state.chordDrawn.slice(), rootPc: info?.rootPc ?? null, typeId: info?.typeId ?? null }]
+    .filter((c) => c.frets.some((f) => f >= 0));
+  if (!seq.length) return;
+  const key = chord.key;
+  const k = key || (seq[0].typeId ? { tonic: seq[0].rootPc, mode: 'major' } : null);
+  const chords = seq.map((c) => ({ name: c.name, frets: c.frets, rootPc: c.rootPc, numeral: k && c.typeId ? numeral(c, k) : '' }));
+  const tuning = currentTuning().notes;
+  const tName = state.tuningId === 'custom' ? 'Custom tuning' : `${(TUNINGS.find((t) => t.id === state.tuningId) || TUNINGS[0]).name} tuning`;
+  const subtitle = [key ? key.name : '', tName, `${chords.length} chord${chords.length > 1 ? 's' : ''}`].filter(Boolean).join(' · ');
+  try { await document.fonts?.ready; } catch {}
+  const canvas = drawChordSheet(chords, { tuning, title: chords.map((c) => c.name).join(' – '), subtitle });
+  const fname = `fretlab-${chords.map((c) => c.name).join('-').replace(/[^\w#♯♭-]+/g, '').replace(/[♯#]/g, 's').replace(/♭/g, 'b').slice(0, 60) || 'progression'}.jpg`;
+  try { await saveJpeg(canvas, fname); } catch (e) { console.error(e); }
 }
 
 /** Loop the progression, one chord per bar at the metronome's tempo. */
@@ -1021,6 +1041,7 @@ function renderChord() {
         : has ? `<button class="btn primary small done-btn" type="button" data-done title="Finished drawing: show where to go next">${icon('M4 12l5 5L20 6')}<span>Done</span></button>` : '')
       + `<span class="tools-gap"></span>`
       + (state.chordProg.length ? `<button class="btn icon act" type="button" data-loop aria-pressed="${!!chord.loop}" aria-label="${chord.loop ? 'Stop' : 'Loop the progression'}" title="${chord.loop ? 'Stop' : 'Loop the progression (metronome tempo)'}">${icon(chord.loop ? 'M6 6h12v12H6z' : 'M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4')}</button>` : '')
+      + (state.chordProg.length ? `<button class="btn icon act" type="button" data-export aria-label="Save as a picture" title="Save the progression as a JPEG of chord diagrams">${icon('M12 4v11M7 10l5 5 5-5M4 19h16')}</button>` : '')
       + (state.chordProg.length ? `<button class="btn icon act" type="button" data-undo aria-label="Back one chord" title="Back one chord">${icon('M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3')}</button>` : '')
       + (has || state.chordProg.length ? `<button class="btn icon act" type="button" data-clear aria-label="Clear" title="Start again">${icon('M6 6l12 12M18 6L6 18')}</button>` : '');
     // the progression, with roman numerals; tap an earlier chord to go back to it
